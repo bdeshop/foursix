@@ -252,10 +252,11 @@ const Exclusivegames = () => {
       </style>
 
       {/* Header Title */}
-      <div className="px-4 pt-6">
-        <h1 className="text-white text-xl md:text-2xl font-bold">Exclusive Games</h1>
-        <p className="text-gray-400 text-sm mt-1">Discover our premium collection of games</p>
-        
+      <div className="px-4 pt-8">
+          <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
+            <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
+          Exclusive Games
+          </h2>
         {/* Show how many games are visible */}
         {!loading && displayedGames.length > 0 && (
           <p className="text-gray-500 text-xs mt-2">
@@ -273,7 +274,7 @@ const Exclusivegames = () => {
           <div className="px-2 md:p-4">
             {displayedGames.length === 0 ? (
               <div className="text-center py-10">
-                <p className="text-gray-400 text-lg">No exclusive games available at the moment.</p>
+                <p className="text-gray-400 text-sm">No exclusive games available at the moment.</p>
               </div>
             ) : (
               <>
