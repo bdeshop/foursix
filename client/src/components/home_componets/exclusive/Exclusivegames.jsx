@@ -253,9 +253,9 @@ const Exclusivegames = () => {
 
       {/* Header Title */}
       <div className="px-4 pt-8">
-          <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
+            <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
             <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
-          Exclusive Games
+        Exclusive Games
           </h2>
         {/* Show how many games are visible */}
         {!loading && displayedGames.length > 0 && (
@@ -274,7 +274,7 @@ const Exclusivegames = () => {
           <div className="px-2 md:p-4">
             {displayedGames.length === 0 ? (
               <div className="text-center py-10">
-                <p className="text-gray-400 text-sm">No exclusive games available at the moment.</p>
+                <p className="text-gray-400 text-lg">No exclusive games available at the moment.</p>
               </div>
             ) : (
               <>
@@ -283,7 +283,7 @@ const Exclusivegames = () => {
                   {displayedGames.map((game) => (
                     <div
                       key={game._id}
-                      className="flex flex-col items-center bg-[#2A3254] rounded-[8px] border-[1px] border-gray-700 p-[10px] overflow-hidden transition-all cursor-pointer relative group hover:border-theme_color hover:shadow-lg hover:shadow-theme_color/20"
+                      className="flex flex-col items-center rounded-[8px] overflow-hidden transition-all cursor-pointer relative group hover:border-theme_color hover:shadow-lg hover:shadow-theme_color/20"
                       onClick={() => handleGameClick(game)}
                     >
                       <div className="game-image-container">
@@ -295,16 +295,6 @@ const Exclusivegames = () => {
                             e.target.src = 'https://via.placeholder.com/100x133/2A3254/ffffff?text=Game';
                           }}
                         />
-                      </div>
-                      <div className="pt-3 w-full">
-                        <p className="text-white text-[11px] md:text-[12px] font-medium text-center truncate uppercase group-hover:text-theme_color transition-colors">
-                          {game.name}
-                        </p>
-                        {game.provider && (
-                          <p className="text-gray-500 text-[10px] text-center truncate mt-1">
-                            {game.provider.name}
-                          </p>
-                        )}
                       </div>
                     </div>
                   ))}
