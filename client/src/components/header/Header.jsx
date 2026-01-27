@@ -708,36 +708,45 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
               </div>
 
               {/* Mobile View */}
-              <div className="md:hidden flex px-[10px] items-center gap-2">
-                <div className="bg-box_bg rounded-[5px] border-[1px] border-gray-800 flex items-center">
-                  <div className="flex items-center space-x-2 px-3 py-2 text-sm">
-                    <img
-                      src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/currency-type/bdt.png?v=1755600713311&source=drccdnsrc"
-                      className="w-4 h-4"
-                      alt="BDT"
-                    />
-                    <span className="text-white min-w-[40px]">
-                     {parseFloat(userData?.balance || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <button
-                    className="px-3 py-2 hover:bg-[#444] cursor-pointer text-white transition-colors duration-200 border-l border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={refreshBalance}
-                    disabled={isRefreshingBalance}
-                    aria-label="Refresh balance"
-                  >
-                    <FiRefreshCw 
-                      className={`w-4 h-4 ${isRefreshingBalance ? 'animate-spin' : ''}`}
-                    />
-                  </button>
-                </div>
-                <NavLink
-                  to="/member/deposit"
-                  className="bg-theme_color text-[12px] px-3 py-2 rounded-[3px] hover:bg-theme_color/80 transition-all duration-200 cursor-pointer font-medium text-white"
-                >
-                  Deposit
-                </NavLink>
-              </div>
+<div className="md:hidden flex px-[10px] items-center gap-2">
+  <div className="bg-box_bg rounded-[5px] border-[1px] border-gray-800 flex items-center">
+    <div className="flex items-center space-x-2 px-2 py-2 text-[12px]">
+      <img
+        src="https://img.b112j.com/bj/h5/assets/v3/images/icon-set/currency-type/bdt.png?v=1755600713311&source=drccdnsrc"
+        className="w-4 h-4"
+        alt="BDT"
+      />
+      <span className="text-white min-w-[40px]">
+        {parseFloat(userData?.balance || 0).toFixed(2)}
+      </span>
+    </div>
+    <button
+      className="px-3 py-2 hover:bg-[#444] cursor-pointer text-white transition-colors duration-200 border-l border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+      onClick={refreshBalance}
+      disabled={isRefreshingBalance}
+      aria-label="Refresh balance"
+    >
+      <FiRefreshCw 
+        className={`w-4 h-4 ${isRefreshingBalance ? 'animate-spin' : ''}`}
+      />
+    </button>
+  </div>
+  
+  {/* Added Withdrawal Button */}
+  <NavLink
+    to="/member/withdraw"
+    className="text-white text-[12px] px-3 py-2 border-[1px] cursor-pointer border-gray-700 rounded hover:bg-[#333] transition-all duration-200"
+  >
+    Withdrawal
+  </NavLink>
+  
+  <NavLink
+    to="/member/deposit"
+    className="bg-theme_color text-[12px] px-3 py-2 rounded-[3px] hover:bg-theme_color/80 transition-all duration-200 cursor-pointer font-medium text-white"
+  >
+    Deposit
+  </NavLink>
+</div>
             </>
           ) : (
             <>
