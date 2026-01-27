@@ -491,7 +491,7 @@ const HomeContent = () => {
             <div className="z-10 flex justify-center items-center">
               <img 
                 className="w-[130px] md:w-[160px] object-contain" 
-                src={dynamicLogo} 
+                src={logo} 
                 alt="Logo" 
               />
             </div>
