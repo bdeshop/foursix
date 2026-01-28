@@ -387,7 +387,7 @@ const Newgames = () => {
 
     try {
       const formData = new FormData();
-      formData.append("gameApiID", gameToSave._id);
+      formData.append("gameApiID", gameToSave.game_uuid);
       formData.append("name", gameToSave.name);
       formData.append("provider", gameToSave.provider.name);
       
