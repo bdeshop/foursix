@@ -613,7 +613,7 @@ const Newgames = () => {
                       <div className="p-4">
                         <div className="relative h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden group">
                           <img
-                            src={game.image}
+                            src={game?.localLandscapePreview}
                             alt={game.name}
                             className="w-full h-full object-contain p-4 transition-transform duration-300 group-hover:scale-105"
                           />
