@@ -2770,29 +2770,39 @@ Adminrouter.post(
   async (req, res) => {
     try {
       const { name, provider, featured, status, gameApiID, category, fullScreen } = req.body;
-      console.log(req.body)
       
+      // Check if gameApiID already exists BEFORE processing files
+      const existingGame = await Game.findOne({ gameApiID: gameApiID });
+      if (existingGame) {
+        return res.status(400).json({ 
+          error: `Game API ID "${gameApiID}" is already in use!` 
+        });
+      }
+
       const gameProviderFont = await GameProvider.findOne({ name: provider });
       if (!gameProviderFont) {
         return res.status(400).json({ error: "Game provider font not found" });
       }
 
-      console.log(name, provider, category, featured, status, gameApiID, fullScreen);
-
-      // Validation
-      if (!name || !provider || !category || !gameApiID) {
-        return res.status(400).json({ error: "All fields are required" });
+      // Enhanced validation
+      const requiredFields = { name, provider, category, gameApiID };
+      const missingFields = Object.keys(requiredFields).filter(field => !requiredFields[field]);
+      
+      if (missingFields.length > 0) {
+        return res.status(400).json({ 
+          error: `Missing required fields: ${missingFields.join(', ')}` 
+        });
       }
 
       if (!req.files || !req.files.portraitImage || !req.files.landscapeImage) {
-        return res
-          .status(400)
-          .json({ error: "Both portrait and landscape images are required" });
+        return res.status(400).json({ 
+          error: "Both portrait and landscape images are required" 
+        });
       }
 
       const gameData = {
         name,
-        gameId:gameApiID,
+        gameId: gameApiID,
         provider,
         category,
         portraitImage: `/uploads/games/portrait/${req.files.portraitImage[0].filename}`,
@@ -2813,9 +2823,9 @@ Adminrouter.post(
     } catch (error) {
       console.error("Error creating game:", error);
       if (error.code === 11000) {
-        return res
-          .status(400)
-          .json({ error: "A game with this Game API ID already exists." });
+        return res.status(400).json({ 
+          error: "A game with this Game API ID already exists. Please use a different ID." 
+        });
       }
       res.status(500).json({ error: "Failed to create game" });
     }

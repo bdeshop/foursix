@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaUpload, FaTimes, FaSpinner } from "react-icons/fa";
+import { FaUpload, FaTimes, FaSpinner, FaFilter, FaGamepad, FaSave } from "react-icons/fa";
+import { MdCategory, MdCheckBox, MdCheckBoxOutlineBlank } from "react-icons/md";
 import Header from "../../components/Header";
 import Sidebar from "../../components/Sidebar";
 import { toast } from "react-toastify";
@@ -19,8 +20,134 @@ const Newgames = () => {
   const [loadingGames, setLoadingGames] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [savingGameId, setSavingGameId] = useState(null);
+  const [showProvidersDropdown, setShowProvidersDropdown] = useState(false);
+  const [showCategoriesDropdown, setShowCategoriesDropdown] = useState(false);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  // Custom Select Component
+  const CustomSelect = ({ 
+    options, 
+    value, 
+    onChange, 
+    placeholder, 
+    loading, 
+    icon: Icon, 
+    dropdownOpen, 
+    setDropdownOpen,
+    label 
+  }) => {
+    const selectedOption = options.find(opt => opt._id === value || opt.value === value);
+    
+    return (
+      <div className="relative w-full">
+        {label && (
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {label}
+          </label>
+        )}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            disabled={loading}
+            className="w-full px-4 py-3 text-left bg-white border border-gray-300 rounded-[10px] focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 flex items-center justify-between transition-all duration-200 hover:border-orange-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center space-x-3">
+              {Icon && <Icon className="text-gray-400 text-lg" />}
+              <span className={selectedOption ? "text-gray-900" : "text-gray-500"}>
+                {loading ? `Loading ${placeholder}...` : 
+                 selectedOption ? selectedOption.name || selectedOption.label : 
+                 `Select ${placeholder}`}
+              </span>
+            </div>
+            <svg 
+              className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${dropdownOpen ? 'transform rotate-180' : ''}`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {dropdownOpen && (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+              {options.length === 0 ? (
+                <div className="px-4 py-3 text-gray-500 text-sm">
+                  {loading ? 'Loading...' : 'No options available'}
+                </div>
+              ) : (
+                options.map((option) => (
+                  <div
+                    key={option._id || option.value}
+                    onClick={() => {
+                      onChange(option._id || option.value);
+                      setDropdownOpen(false);
+                    }}
+                    className={`px-4 py-3 cursor-pointer flex items-center space-x-3 transition-colors duration-150 ${
+                      value === (option._id || option.value)
+                        ? 'bg-orange-50 text-orange-600'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {value === (option._id || option.value) ? (
+                      <MdCheckBox className="text-orange-500 text-lg" />
+                    ) : (
+                      <MdCheckBoxOutlineBlank className="text-gray-400 text-lg" />
+                    )}
+                    <span>{option.name || option.label}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Custom Checkbox Component
+  const CustomCheckbox = ({ id, checked, onChange, label, description }) => (
+    <div className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors duration-150">
+      <div className="relative flex items-center h-5 mt-0.5">
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          className="hidden"
+        />
+        <label
+          htmlFor={id}
+          className="cursor-pointer"
+        >
+          <div className={`w-5 h-5 border-2 rounded-md flex items-center justify-center transition-all duration-200 ${
+            checked 
+              ? 'bg-orange-500 border-orange-500' 
+              : 'bg-white border-gray-300 hover:border-orange-400'
+          }`}>
+            {checked && (
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </div>
+        </label>
+      </div>
+      <div className="flex-1">
+        <label
+          htmlFor={id}
+          className="text-sm font-medium text-gray-700 cursor-pointer select-none"
+        >
+          {label}
+        </label>
+        {description && (
+          <p className="text-xs text-gray-500 mt-1">{description}</p>
+        )}
+      </div>
+    </div>
+  );
 
   // Fetch categories from local API
   useEffect(() => {
@@ -121,7 +248,7 @@ const Newgames = () => {
               localId: localGame._id,
               localFeatured: localGame.featured,
               localStatus: localGame.status,
-              localFullScreen: localGame.fullScreen || false, // Add fullScreen from local game
+              localFullScreen: localGame.fullScreen || false,
               localCategory: localGame.category,
               localPortraitPreview: `${base_url}${localGame.portraitImage}`,
               localLandscapePreview: `${base_url}${localGame.landscapeImage}`,
@@ -134,7 +261,7 @@ const Newgames = () => {
               isSaved: false,
               localFeatured: false,
               localStatus: true,
-              localFullScreen: false, // Default to false for new games
+              localFullScreen: false,
               localCategory: selectedCategory || "",
               localPortraitImage: null,
               localLandscapeImage: null,
@@ -156,7 +283,6 @@ const Newgames = () => {
     fetchAndMergeGames();
   }, [selectedProvider]);
 
-  // Update games when selectedCategory changes
   useEffect(() => {
     if (selectedCategory) {
       setGames(prevGames => 
@@ -237,444 +363,482 @@ const Newgames = () => {
     );
   };
 
-const handleSaveOrUpdateGame = async (gameApiID) => {
-  const gameToSave = games.find((g) => g._id === gameApiID);
-  
-  // Validation for new games
-  if (
-    !gameToSave.isSaved &&
-    (!gameToSave.localPortraitImage || !gameToSave.localLandscapeImage)
-  ) {
-    toast.error(
-      "Please upload both portrait and landscape images for a new game."
-    );
-    return;
-  }
-
-  // Validate category for new games
-  if (!gameToSave.isSaved && !gameToSave.localCategory) {
-    toast.error("Please select a category for the game.");
-    return;
-  }
-
-  setSavingGameId(gameApiID);
-
-  try {
-    const formData = new FormData();
-    formData.append("gameApiID", gameToSave.game_uuid); // Changed from game_uuid to _id
-    formData.append("name", gameToSave.name);
-    formData.append("provider", gameToSave.provider.name);
-    console.log("gameApiID",gameToSave)
-    // Add category to form data
-    const selectedCat = categories.find(cat => 
-      cat._id === gameToSave.localCategory || cat.name === gameToSave.localCategory
-    );
-    if (selectedCat) {
-      formData.append("category", selectedCat.name);
-    } else {
-      formData.append("category", gameToSave.localCategory || "");
-    }
+  const handleSaveOrUpdateGame = async (gameApiID) => {
+    const gameToSave = games.find((g) => g._id === gameApiID);
     
-    formData.append("featured", gameToSave.localFeatured);
-    formData.append("status", gameToSave.localStatus);
-    formData.append("fullScreen", gameToSave.localFullScreen);
-    
-    if (gameToSave.localPortraitImage) {
-      formData.append("portraitImage", gameToSave.localPortraitImage);
-    }
-    if (gameToSave.localLandscapeImage) {
-      formData.append("landscapeImage", gameToSave.localLandscapeImage);
+    // Validation for new games
+    if (
+      !gameToSave.isSaved &&
+      (!gameToSave.localPortraitImage || !gameToSave.localLandscapeImage)
+    ) {
+      toast.error(
+        "Please upload both portrait and landscape images for a new game."
+      );
+      return;
     }
 
-    const isUpdate = gameToSave.isSaved;
-    const url = isUpdate
-      ? `${base_url}/api/admin/games/${gameToSave.localId}`
-      : `${base_url}/api/admin/games`;
-    const method = isUpdate ? "PUT" : "POST";
-    const response = await fetch(url, {
-      method: method,
-      body: formData,
-    });
+    // Validate category for new games
+    if (!gameToSave.isSaved && !gameToSave.localCategory) {
+      toast.error("Please select a category for the game.");
+      return;
+    }
 
-    const result = await response.json();
-    if (response.ok) {
-      toast.success(
-        `Game "${gameToSave.name}" ${
-          isUpdate ? "updated" : "added"
-        } successfully!`
+    setSavingGameId(gameApiID);
+
+    try {
+      const formData = new FormData();
+      formData.append("gameApiID", gameToSave._id);
+      formData.append("name", gameToSave.name);
+      formData.append("provider", gameToSave.provider.name);
+      
+      const selectedCat = categories.find(cat => 
+        cat._id === gameToSave.localCategory || cat.name === gameToSave.localCategory
       );
-      setGames((prevGames) =>
-        prevGames.map((g) =>
-          g._id === gameApiID
-            ? {
-                ...g,
-                isSaved: true,
-                localId: result.game._id,
-                localCategory: result.game.category,
-                localFullScreen: result.game.fullScreen || false,
-                localPortraitImage: null,
-                localLandscapeImage: null,
-              }
-            : g
-        )
-      );
-    } else {
-      // Handle duplicate key error specifically
-      if (response.status === 400) {
-        // Check for duplicate key error messages from backend
+      if (selectedCat) {
+        formData.append("category", selectedCat.name);
+      } else {
+        formData.append("category", gameToSave.localCategory || "");
+      }
+      
+      formData.append("featured", gameToSave.localFeatured);
+      formData.append("status", gameToSave.localStatus);
+      formData.append("fullScreen", gameToSave.localFullScreen);
+      
+      if (gameToSave.localPortraitImage) {
+        formData.append("portraitImage", gameToSave.localPortraitImage);
+      }
+      if (gameToSave.localLandscapeImage) {
+        formData.append("landscapeImage", gameToSave.localLandscapeImage);
+      }
+
+      const isUpdate = gameToSave.isSaved;
+      const url = isUpdate
+        ? `${base_url}/api/admin/games/${gameToSave.localId}`
+        : `${base_url}/api/admin/games`;
+      const method = isUpdate ? "PUT" : "POST";
+      
+      const response = await fetch(url, {
+        method: method,
+        body: formData,
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        toast.success(
+          `Game "${gameToSave.name}" ${
+            isUpdate ? "updated" : "added"
+          } successfully!`
+        );
+        setGames((prevGames) =>
+          prevGames.map((g) =>
+            g._id === gameApiID
+              ? {
+                  ...g,
+                  isSaved: true,
+                  localId: result.game._id,
+                  localCategory: result.game.category,
+                  localFullScreen: result.game.fullScreen || false,
+                  localPortraitImage: null,
+                  localLandscapeImage: null,
+                }
+              : g
+          )
+        );
+      } else {
         const errorMsg = result.error || "";
         
-        if (errorMsg.includes("Game API ID already exists") || 
-            errorMsg.includes("duplicate key error") ||
-            errorMsg.includes("E11000")) {
-          toast.error(`⚠️ Game API ID "${gameToSave._id}" is already in use! Please use a different ID.`);
-        } else if (errorMsg.includes("All fields are required")) {
-          toast.error("❌ All fields are required to save the game.");
-        } else if (errorMsg.includes("images are required")) {
-          toast.error("❌ Both portrait and landscape images are required.");
+        if (response.status === 400) {
+          if (errorMsg.includes("Game API ID already exists") || 
+              errorMsg.includes("duplicate key error") ||
+              errorMsg.includes("E11000") ||
+              errorMsg.includes("already in use")) {
+            toast.error(`⚠️ Game API ID "${gameToSave._id}" is already in use!`);
+          } else if (errorMsg.includes("All fields are required") || 
+                    errorMsg.includes("Missing required fields")) {
+            toast.error(`❌ ${errorMsg}`);
+          } else if (errorMsg.includes("images are required")) {
+            toast.error("❌ Both portrait and landscape images are required.");
+          } else {
+            toast.error(`❌ ${errorMsg || `Failed to ${isUpdate ? "update" : "add"} game.`}`);
+          }
         } else {
-          // Generic error
-          toast.error(`❌ ${errorMsg || `Failed to ${isUpdate ? "update" : "add"} game.`}`);
+          toast.error(
+            result.error ||
+              `❌ Failed to ${isUpdate ? "update" : "add"} game "${
+                gameToSave.name
+              }".`
+          );
         }
-      } else {
-        toast.error(
-          result.error ||
-            `❌ Failed to ${isUpdate ? "update" : "add"} game "${
-              gameToSave.name
-            }".`
-        );
       }
+    } catch (error) {
+      console.error("Error saving game:", error);
+      toast.error("❌ An error occurred while saving the game.");
+    } finally {
+      setSavingGameId(null);
     }
-  } catch (error) {
-    console.error("Error saving game:", error);
-    toast.error("❌ An error occurred while saving the game.");
-  } finally {
-    setSavingGameId(null);
-  }
-};
+  };
+
   return (
-    <section className="font-nunito h-screen bg-gray-50">
+    <section className="font-nunito min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Header toggleSidebar={toggleSidebar} />
       <div className="flex pt-[10vh]">
         <Sidebar isOpen={isSidebarOpen} />
         <main
-          className={`transition-all duration-300 flex-1 p-6 overflow-y-auto h-[90vh] ${
+          className={`transition-all duration-300 flex-1 p-4 md:p-6 overflow-y-auto min-h-[90vh] ${
             isSidebarOpen ? "md:ml-[40%] lg:ml-[28%] xl:ml-[17%]" : "ml-0"
           }`}
         >
           <div className="w-full mx-auto">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">
-              Add New Games from Provider
-            </h1>
-
-            <div className="bg-white rounded-lg shadow-md p-6 border border-orange-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Game Provider
-                  </label>
-                  <select
-                    value={selectedProvider}
-                    onChange={(e) => setSelectedProvider(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color"
-                    disabled={loadingProviders}
-                  >
-                    <option value="">
-                      {loadingProviders
-                        ? "Loading providers..."
-                        : "Select a provider"}
-                    </option>
-                    {providers.map((provider) => (
-                      <option key={provider._id} value={provider._id}>
-                        {provider.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Default Category (for new games)
-                  </label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color"
-                    disabled={loadingCategories}
-                  >
-                    <option value="">
-                      {loadingCategories
-                        ? "Loading categories..."
-                        : "Select a category"}
-                    </option>
-                    {categories
-                      .filter(cat => cat.status)
-                      .map((category) => (
-                        <option key={category._id} value={category._id}>
-                          {category.name}
-                        </option>
-                      ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    This category will be applied to all new games you add
-                  </p>
-                </div>
-              </div>
+            {/* Header Section */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                Add New Games
+              </h1>
+              <p className="text-gray-600">
+                Import games from providers and customize them for your platform
+              </p>
             </div>
 
+            {/* Filter Card */}
+            <div className="bg-white rounded-2xl  border border-gray-200 p-6 mb-8">
+              <div className="flex items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-800">Filter Games</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <CustomSelect
+                  options={providers}
+                  value={selectedProvider}
+                  onChange={setSelectedProvider}
+                  placeholder="provider"
+                  loading={loadingProviders}
+                  icon={FaGamepad}
+                  dropdownOpen={showProvidersDropdown}
+                  setDropdownOpen={setShowProvidersDropdown}
+                  label="Select Game Provider"
+                />
+                
+                <CustomSelect
+                  options={categories.filter(cat => cat.status)}
+                  value={selectedCategory}
+                  onChange={setSelectedCategory}
+                  placeholder="category"
+                  loading={loadingCategories}
+                  icon={MdCategory}
+                  dropdownOpen={showCategoriesDropdown}
+                  setDropdownOpen={setShowCategoriesDropdown}
+                  label="Default Category for New Games"
+                />
+              </div>
+              
+              {/* {selectedCategory && (
+                <div className="mt-4 p-4 bg-orange-50 rounded-lg border border-orange-100">
+                  <p className="text-sm text-orange-800 flex items-center">
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    New games will be automatically assigned to <span className="font-semibold ml-1">
+                      {categories.find(c => c._id === selectedCategory)?.name}
+                    </span>
+                  </p>
+                </div>
+              )} */}
+            </div>
+
+            {/* Loading State */}
             {loadingGames && (
-              <div className="flex justify-center items-center h-64">
-                <FaSpinner className="animate-spin text-orange-500 text-4xl" />
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="relative">
+                  <FaSpinner className="animate-spin text-orange-500 text-5xl" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-transparent blur-xl"></div>
+                </div>
+                <p className="mt-4 text-gray-600 font-medium">Loading games from provider...</p>
+                <p className="text-sm text-gray-500">This may take a moment</p>
               </div>
             )}
 
+            {/* Games Grid */}
             {!loadingGames && games.length > 0 && (
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {games.map((game) => (
-                  <div
-                    key={game._id}
-                    className={`bg-white rounded-lg shadow-md p-4 border flex flex-col ${
-                      game.isSaved ? "border-green-400" : "border-gray-200"
-                    }`}
-                  >
-                    <h3 className="text-lg font-bold text-gray-800 truncate">
-                      {game.name}
-                    </h3>
-                    <div className="text-sm text-gray-500 mb-4 space-y-1">
-                      <p>Provider: {game.provider.name}</p>
-                      <p>External Category: {game.category.name}</p>
-                    </div>
-
-                    <img
-                      src={game.image}
-                      alt={game.name}
-                      className="w-full h-40 object-contain rounded-md mb-4 bg-gray-100"
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Local Category
-                        </label>
-                        <select
-                          value={game.localCategory || ""}
-                          onChange={(e) =>
-                            handleGameDataChange(
-                              game._id,
-                              "localCategory",
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-[3px] outline-theme_color"
-                          disabled={loadingCategories}
-                        >
-                          <option value="">
-                            Select category
-                          </option>
-                          {categories
-                            .filter(cat => cat.status)
-                            .map((category) => (
-                              <option key={category._id} value={category._id}>
-                                {category.name}
-                              </option>
-                            ))}
-                        </select>
-                        {!game.isSaved && !game.localCategory && (
-                          <p className="text-xs text-red-500 mt-1">
-                            Category is required
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center">
-                          <input
-                            id={`featured-${game._id}`}
-                            type="checkbox"
-                            checked={game.localFeatured}
-                            onChange={(e) =>
-                              handleGameDataChange(
-                                game._id,
-                                "localFeatured",
-                                e.target.checked
-                              )
-                            }
-                            className="h-4 w-4 text-orange-500 focus:ring-orange-400 border-gray-300 rounded"
-                          />
-                          <label
-                            htmlFor={`featured-${game._id}`}
-                            className="ml-2 block text-sm text-gray-700"
-                          >
-                            Featured
-                          </label>
-                        </div>
-                        <div className="flex items-center">
-                          <input
-                            id={`status-${game._id}`}
-                            type="checkbox"
-                            checked={game.localStatus}
-                            onChange={(e) =>
-                              handleGameDataChange(
-                                game._id,
-                                "localStatus",
-                                e.target.checked
-                              )
-                            }
-                            className="h-4 w-4 text-orange-500 focus:ring-orange-400 border-gray-300 rounded"
-                          />
-                          <label
-                            htmlFor={`status-${game._id}`}
-                            className="ml-2 block text-sm text-gray-700"
-                          >
-                            Active
-                          </label>
-                        </div>
-                        <div className="flex items-center">
-                          <input
-                            id={`fullscreen-${game._id}`}
-                            type="checkbox"
-                            checked={game.localFullScreen}
-                            onChange={(e) =>
-                              handleGameDataChange(
-                                game._id,
-                                "localFullScreen",
-                                e.target.checked
-                              )
-                            }
-                            className="h-4 w-4 text-orange-500 focus:ring-orange-400 border-gray-300 rounded"
-                          />
-                          <label
-                            htmlFor={`fullscreen-${game._id}`}
-                            className="ml-2 block text-sm text-gray-700"
-                          >
-                            Full Screen
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      {/* Portrait Image */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Portrait *
-                        </label>
-                        {game.localPortraitPreview ? (
-                          <div className="relative">
-                            <img
-                              src={game.localPortraitPreview}
-                              alt="Portrait"
-                              className="h-24 w-full object-contain border rounded"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(game._id, "portrait")}
-                              className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full text-xs"
-                            >
-                              <FaTimes />
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="flex justify-center w-full h-24 px-2 border-2 border-dashed rounded-md cursor-pointer">
-                            <span className="flex items-center space-x-2">
-                              <FaUpload className="text-gray-400" />
-                              <span className="font-medium text-gray-500 text-xs">
-                                Upload
-                              </span>
-                            </span>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*"
-                              onChange={(e) =>
-                                handleImageUpload(
-                                  game._id,
-                                  "portrait",
-                                  e.target.files[0]
-                                )
-                              }
-                            />
-                          </label>
-                        )}
-                      </div>
-                      {/* Landscape Image */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Landscape *
-                        </label>
-                        {game.localLandscapePreview ? (
-                          <div className="relative">
-                            <img
-                              src={game.localLandscapePreview}
-                              alt="Landscape"
-                              className="h-24 w-full object-contain border rounded"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(game._id, "landscape")}
-                              className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full text-xs"
-                            >
-                              <FaTimes />
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="flex justify-center w-full h-24 px-2 border-2 border-dashed rounded-md cursor-pointer">
-                            <span className="flex items-center space-x-2">
-                              <FaUpload className="text-gray-400" />
-                              <span className="font-medium text-gray-500 text-xs">
-                                Upload
-                              </span>
-                            </span>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*"
-                              onChange={(e) =>
-                                handleImageUpload(
-                                  game._id,
-                                  "landscape",
-                                  e.target.files[0]
-                                )
-                              }
-                            />
-                          </label>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleSaveOrUpdateGame(game._id)}
-                        disabled={savingGameId === game._id || (!game.isSaved && !game.localCategory)}
-                        className={`w-full px-4 py-2 text-white font-medium rounded-md focus:outline-none transition-colors flex items-center justify-center ${
-                          game.isSaved
-                            ? "bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300"
-                            : "bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300"
-                        } ${savingGameId === game._id ? 'opacity-70' : ''}`}
-                      >
-                        {savingGameId === game._id ? (
-                          <>
-                            <FaSpinner className="animate-spin mr-2" />
-                            Saving...
-                          </>
-                        ) : game.isSaved ? (
-                          "Update Game"
-                        ) : (
-                          "Save Game"
-                        )}
-                      </button>
-                    </div>
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    Found {games.length} {games.length === 1 ? 'game' : 'games'}
+                  </h3>
+                  <div className="flex items-center space-x-2 text-sm">
+                    <span className="flex items-center">
+                      <div className="w-3 h-3 bg-green-400 rounded-full mr-2"></div>
+                      <span className="text-gray-600">Saved to database</span>
+                    </span>
+                    <span className="flex items-center ml-4">
+                      <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
+                      <span className="text-gray-600">New game</span>
+                    </span>
                   </div>
-                ))}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {games.map((game) => (
+                    <div
+                      key={game._id}
+                      className={`bg-white rounded-2xl shadow-lg overflow-hidden border-2 transition-all duration-300 hover:shadow-xl ${
+                        game.isSaved 
+                          ? 'border-green-400 hover:border-green-500' 
+                          : 'border-orange-300 hover:border-orange-400'
+                      }`}
+                    >
+                      {/* Game Header */}
+                      <div className={`p-4 ${game.isSaved ? 'bg-gradient-to-r from-green-50 to-white' : 'bg-gradient-to-r from-orange-50 to-white'}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-lg font-bold text-gray-900 truncate pr-2">
+                            {game.name}
+                          </h3>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${game.isSaved ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                            {game.isSaved ? 'Saved' : 'New'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p className="flex items-center">
+                            <span className="font-medium mr-2">Provider:</span>
+                            {game.provider.name}
+                          </p>
+                          <p className="flex items-center">
+                            <span className="font-medium mr-2">Category:</span>
+                            {game.category.name}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Game Preview */}
+                      <div className="p-4">
+                        <div className="relative h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden group">
+                          <img
+                            src={game.image}
+                            alt={game.name}
+                            className="w-full h-full object-contain p-4 transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </div>
+
+                        {/* Custom Category Selector */}
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Assign Category
+                          </label>
+                          <div className="relative">
+                            <div className="flex flex-wrap gap-2">
+                              {categories
+                                .filter(cat => cat.status)
+                                .map((category) => (
+                                  <button
+                                    key={category._id}
+                                    onClick={() => handleGameDataChange(game._id, 'localCategory', category._id)}
+                                    className={`px-3 py-1.5 text-sm rounded-lg border transition-all duration-200 ${
+                                      game.localCategory === category._id
+                                        ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+                                    }`}
+                                  >
+                                    {category.name}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+                          {!game.isSaved && !game.localCategory && (
+                            <p className="text-xs text-red-500 mt-2 flex items-center">
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              Category is required
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Game Settings */}
+                        <div className="mt-4 ">
+                          <CustomCheckbox
+                            id={`featured-${game._id}`}
+                            checked={game.localFeatured}
+                            onChange={(e) => handleGameDataChange(game._id, 'localFeatured', e.target.checked)}
+                            label="Featured Game"
+                            description="Show this game in featured section"
+                          />
+                          <CustomCheckbox
+                            id={`status-${game._id}`}
+                            checked={game.localStatus}
+                            onChange={(e) => handleGameDataChange(game._id, 'localStatus', e.target.checked)}
+                            label="Active Status"
+                            description="Game will be visible to users"
+                          />
+                          <CustomCheckbox
+                            id={`fullscreen-${game._id}`}
+                            checked={game.localFullScreen}
+                            onChange={(e) => handleGameDataChange(game._id, 'localFullScreen', e.target.checked)}
+                            label="Full Screen Mode"
+                            description="Launch game in full screen"
+                          />
+                        </div>
+
+                        {/* Image Upload Section */}
+                        <div className="mt-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Portrait Image */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Portrait Image
+                              </label>
+                              {game.localPortraitPreview ? (
+                                <div className="relative group">
+                                  <div className="h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden">
+                                    <img
+                                      src={game.localPortraitPreview}
+                                      alt="Portrait"
+                                      className="w-full h-full object-contain p-2"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImage(game._id, "portrait")}
+                                    className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <FaTimes className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="block cursor-pointer">
+                                  <div className="h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center transition-all duration-200 hover:border-orange-400 hover:bg-orange-50 group">
+                                    <FaUpload className="text-gray-400 text-xl mb-2 group-hover:text-orange-500 transition-colors" />
+                                    <span className="text-sm font-medium text-gray-500 group-hover:text-orange-600 transition-colors">
+                                      Upload Portrait
+                                    </span>
+                                    <span className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</span>
+                                  </div>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleImageUpload(game._id, "portrait", e.target.files[0])}
+                                  />
+                                </label>
+                              )}
+                            </div>
+
+                            {/* Landscape Image */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Landscape Image
+                              </label>
+                              {game.localLandscapePreview ? (
+                                <div className="relative group">
+                                  <div className="h-32 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden">
+                                    <img
+                                      src={game.localLandscapePreview}
+                                      alt="Landscape"
+                                      className="w-full h-full object-contain p-2"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImage(game._id, "landscape")}
+                                    className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <FaTimes className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="block cursor-pointer">
+                                  <div className="h-32 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center transition-all duration-200 hover:border-orange-400 hover:bg-orange-50 group">
+                                    <FaUpload className="text-gray-400 text-xl mb-2 group-hover:text-orange-500 transition-colors" />
+                                    <span className="text-sm font-medium text-gray-500 group-hover:text-orange-600 transition-colors">
+                                      Upload Landscape
+                                    </span>
+                                    <span className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</span>
+                                  </div>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleImageUpload(game._id, "landscape", e.target.files[0])}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {!game.isSaved && (!game.localPortraitImage || !game.localLandscapeImage) && (
+                            <p className="text-xs text-amber-600 mt-3 flex items-center">
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              Both images are required for new games
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="mt-6 pt-4 border-t border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveOrUpdateGame(game._id)}
+                            disabled={savingGameId === game._id || (!game.isSaved && !game.localCategory)}
+                            className={`w-full px-4 py-3 text-white cursor-pointer font-semibold rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center ${
+                              game.isSaved
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-blue-300 disabled:to-blue-400'
+                                : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-orange-300 disabled:to-orange-400'
+                            } ${savingGameId === game._id ? 'opacity-80 cursor-wait' : ''}`}
+                          >
+                            {savingGameId === game._id ? (
+                              <>
+                                <FaSpinner className="animate-spin mr-2" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                {game.isSaved ? 'Update Game' : 'Save Game'}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
+            {/* Empty State */}
             {!loadingGames && selectedProvider && games.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">
-                  No games found for the selected provider.
+              <div className="text-center py-16 bg-white rounded-2xl shadow-lg border border-gray-200">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
+                  <FaGamepad className="text-gray-400 text-3xl" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No Games Found</h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  No games available for the selected provider. Try selecting a different provider or check if the provider has games available.
                 </p>
+              </div>
+            )}
+
+            {/* Initial State */}
+            {!loadingGames && !selectedProvider && (
+              <div className="text-center py-20">
+                <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-br from-orange-100 to-orange-50 rounded-full flex items-center justify-center">
+                  <FaFilter className="text-orange-400 text-4xl" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">Select a Provider</h3>
+                <p className="text-gray-600 max-w-md mx-auto mb-8">
+                  Choose a game provider from the filter above to start importing games to your platform.
+                </p>
+                <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                    Games already in database
+                  </span>
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                    New games ready to import
+                  </span>
+                </div>
               </div>
             )}
           </div>
