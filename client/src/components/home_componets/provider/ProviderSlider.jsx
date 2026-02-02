@@ -228,14 +228,14 @@ const ProviderSlider = () => {
             providers.map((provider, index) => (
               <div
                 key={index}
-                className="provider-card flex-shrink-0 md:w-40 md:h-20 bg-box_bg flex rounded-[3px] items-center justify-between gap-4 p-2 snap-center transform transition-transform duration-200 hover:scale-105 cursor-pointer"
+                className="provider-card flex-shrink-0 md:w-40  bg-box_bg flex rounded-[3px] items-center justify-between gap-4 p-2 snap-center transform transition-transform duration-200 hover:scale-105 cursor-pointer"
                 onClick={() => handleProviderClick(provider)}
                 title={`View ${provider.name} games`}
               >
                 <img
                   src={`${base_url}/${provider.image}`}
                   alt={provider.name}
-                  className="w-12 md:w-14 object-contain"
+                  className="w-10 md:w-[40px] object-contain"
                 />
                 <span className="mt-2 pr-2 text-sm text-center text-gray-400 font-[600] truncate-text">
                   {truncateName(provider.name)}
