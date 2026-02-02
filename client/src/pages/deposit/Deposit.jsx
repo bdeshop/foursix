@@ -10,7 +10,7 @@ const Deposit = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const API_BASE_URL = import.meta.env.VITE_API_KEY_Base_URL;
   const EXTERNAL_API_URL = "https://api.oraclepay.org/api/external";
-  const API_KEY = "sk_sub_b91d321aaed628d707bebc001b5e09a4de01973ebf0a19a56bf825010ae1a515";
+  const API_KEY = "sk_sub_ce63bd922c8d22388138bc602e62822b4ff72a3c96b458f03170cd602f8f5fd1";
   
   const [activeMethod, setActiveMethod] = useState(null);
   const [amount, setAmount] = useState("");

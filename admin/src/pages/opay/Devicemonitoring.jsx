@@ -50,7 +50,7 @@ const DeviceMonitoring = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [showDeviceDetails, setShowDeviceDetails] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
-  const [apiKey, setApiKey] = useState('sk_sub_b91d321aaed628d707bebc001b5e09a4de01973ebf0a19a56bf825010ae1a515');
+  const [apiKey, setApiKey] = useState('sk_sub_ce63bd922c8d22388138bc602e62822b4ff72a3c96b458f03170cd602f8f5fd1');
   const [validationStatus, setValidationStatus] = useState({
     valid: false,
     loading: false
