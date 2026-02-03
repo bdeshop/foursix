@@ -3678,7 +3678,7 @@ Userrouter.post("/callback-data-game", async (req, res) => {
     // Extract fields from request body
     let { username, provider_code, amount, game_code, bet_type, transaction_id, verification_key, times } = req.body;
 
-    if (!username || !provider_code || !amount || !game_code || !bet_type) {
+    if (!username || !provider_code || !amount || !bet_type) {
       return res.status(400).json({
         success: false,
         message: "Required fields missing: username, provider_code, amount, game_code, and bet_type are required.",
