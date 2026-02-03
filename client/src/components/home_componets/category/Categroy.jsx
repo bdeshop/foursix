@@ -32,7 +32,7 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem("usertoken");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       setLoading(false);
@@ -86,7 +86,7 @@ const CategorySkeleton = ({ isMobile }) => {
   if (isMobile) {
     return (
       <div className="block lg:hidden px-2 py-4 md:p-4 pt-[40px] relative">
-        <div className="flex gap-3 ">
+        <div className="flex gap-3 overflow-hidden">
           {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
@@ -116,19 +116,17 @@ const CategorySkeleton = ({ isMobile }) => {
   );
 };
 
-const ContentSkeleton = ({ isExclusiveCategory }) => {
-  if (isExclusiveCategory) {
+const ContentSkeleton = ({ isSportsCategory }) => {
+  if (isSportsCategory) {
     return (
       <div className="px-2 md:p-4">
-        <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-          {Array.from({ length: 18 }).map((_, index) => (
+        <div className="grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+          {Array.from({ length: 14 }).map((_, index) => (
             <div
               key={index}
-              className="flex flex-col items-center bg-[#2A3254] rounded-[8px] p-[10px]"
+              className="flex flex-col items-center bg-[#2A3254] rounded-[3px] p-[10px] "
             >
-              <div className="game-image-container mb-2">
-                <div className="game-image bg-gray-700 rounded animate-pulse"></div>
-              </div>
+              <div className="w-[100px] h-[133px] bg-gray-700 rounded animate-pulse"></div>
               <div className="pt-2 w-full">
                 <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
               </div>
@@ -163,7 +161,7 @@ const CategoryContent = () => {
 
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
-  const [exclusiveGames, setExclusiveGames] = useState([]);
+  const [menuGames, setMenuGames] = useState([]); // Changed from exclusiveGames to menuGames
   const [displayedGames, setDisplayedGames] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -215,41 +213,41 @@ const CategoryContent = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Sort categories to ensure Exclusive is always first
-  const sortCategoriesWithExclusiveFirst = (categories) => {
+  // Sort categories to ensure Sports is always first
+  const sortCategoriesWithSportsFirst = (categories) => {
     if (!categories || categories.length === 0) return [];
     
-    const exclusiveCategory = categories.find(cat => 
-      cat.name.toLowerCase() === "exclusive"
+    const sportsCategory = categories.find(cat => 
+      cat.name.toLowerCase() === "sports"
     );
     
-    if (!exclusiveCategory) return categories;
+    if (!sportsCategory) return categories;
     
-    // Filter out exclusive category and then add it at the beginning
+    // Filter out sports category and then add it at the beginning
     const otherCategories = categories.filter(cat => 
-      cat.name.toLowerCase() !== "exclusive"
+      cat.name.toLowerCase() !== "sports"
     );
     
-    return [exclusiveCategory, ...otherCategories];
+    return [sportsCategory, ...otherCategories];
   };
 
-  // Find and set Exclusive category as active
-  const setExclusiveCategoryAsActive = async (categories) => {
-    // First, try to find "Exclusive" category (case insensitive)
-    let exclusiveCategory = categories.find(cat => 
-      cat.name.toLowerCase() === "exclusive"
+  // Find and set Sports category as active
+  const setSportsCategoryAsActive = async (categories) => {
+    // First, try to find "Sports" category (case insensitive)
+    let sportsCategory = categories.find(cat => 
+      cat.name.toLowerCase() === "sports"
     );
 
     // If not found, use the first category
-    if (!exclusiveCategory && categories.length > 0) {
-      exclusiveCategory = categories[0];
+    if (!sportsCategory && categories.length > 0) {
+      sportsCategory = categories[0];
     }
 
-    if (exclusiveCategory) {
-      setActiveCategory(exclusiveCategory);
+    if (sportsCategory) {
+      setActiveCategory(sportsCategory);
       setContentLoading(true);
-      // Always fetch exclusive games for the Exclusive tab
-      await fetchExclusiveGames();
+      // Always fetch menu games for the Sports tab
+      await fetchMenuGames();
       setContentLoading(false);
     }
   };
@@ -261,9 +259,9 @@ const CategoryContent = () => {
       
       // If we have cached categories, use them immediately
       if (categoriesCache) {
-        const sortedCategories = sortCategoriesWithExclusiveFirst(categoriesCache);
+        const sortedCategories = sortCategoriesWithSportsFirst(categoriesCache);
         setCategories(sortedCategories);
-        await setExclusiveCategoryAsActive(sortedCategories);
+        await setSportsCategoryAsActive(sortedCategories);
         setLoading(false);
         return;
       }
@@ -276,41 +274,27 @@ const CategoryContent = () => {
     fetchBrandingData();
   }, []);
 
-  // Update displayed games when exclusive games change
+  // Update displayed games when menu games change
   useEffect(() => {
-    if (exclusiveGames.length > 0) {
-      const gamesPerPage = calculateGamesPerPage();
-      const initialGames = exclusiveGames.slice(0, gamesPerPage);
+    if (menuGames.length > 0) {
+      const initialGames = menuGames.slice(0, 20);
       setDisplayedGames(initialGames);
-      setGamesPage(1);
-      setHasMoreGames(exclusiveGames.length > gamesPerPage);
+      setHasMoreGames(menuGames.length > 20);
     } else {
       setDisplayedGames([]);
       setHasMoreGames(false);
-      setGamesPage(1);
     }
-  }, [exclusiveGames, isMobile]);
-
-  // Calculate games per page based on screen size
-  const calculateGamesPerPage = () => {
-    if (isMobile) {
-      // Mobile: 2 columns × 4 rows = 8 games initially
-      return 9;
-    } else {
-      // Desktop: Start with 12 games (2-3 rows depending on columns)
-      return 14;
-    }
-  };
+  }, [menuGames]);
 
   const fetchCategories = async () => {
     try {
       const response = await axios.get(`${base_url}/api/categories`);
       if (response.data.success) {
-        // Sort categories with Exclusive first, then cache them
-        const sortedCategories = sortCategoriesWithExclusiveFirst(response.data.data);
+        // Sort categories with Sports first, then cache them
+        const sortedCategories = sortCategoriesWithSportsFirst(response.data.data);
         categoriesCache = sortedCategories;
         setCategories(sortedCategories);
-        await setExclusiveCategoryAsActive(sortedCategories);
+        await setSportsCategoryAsActive(sortedCategories);
       }
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -327,7 +311,7 @@ const CategoryContent = () => {
       );
       if (response.data.success) {
         setProviders(response.data.data);
-        setExclusiveGames([]); // Clear exclusive games when showing providers
+        setMenuGames([]); // Clear menu games when showing providers
       }
     } catch (error) {
       console.error("Error fetching providers:", error);
@@ -336,37 +320,26 @@ const CategoryContent = () => {
     }
   };
 
-  const fetchExclusiveGames = async () => {
+  const fetchMenuGames = async () => {
     try {
       const response = await axios.get(`${base_url}/api/menu-games`);
-      
-      let gamesData = [];
-      
-      if (response.data && response.data.data) {
-        gamesData = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        gamesData = response.data;
+      if (response.data && response.data.length > 0) {
+        // Filter only sports games if needed, or show all menu games
+        const sportsGames = response.data.filter(game => 
+          game.category && game.category.name.toLowerCase() === "sports"
+        );
+        
+        // Use sports games if available, otherwise use all menu games
+        const gamesToDisplay = sportsGames.length > 0 ? sportsGames : response.data;
+        setMenuGames(gamesToDisplay);
+        setProviders([]); // Clear providers when showing menu games
+        setGamesPage(1);
+      } else {
+        setMenuGames([]);
       }
-      
-      // Try different possible category name variations
-      const exclusiveGamesData = gamesData.filter(game => {
-        if (!game) return false;
-        
-        const categoryName = (game.categoryname || game.category || game.categoryName || '').toLowerCase();
-        const gameName = (game.name || game.gameName || '').toLowerCase();
-        
-        // Check for exclusive category or exclusive in game name
-        return categoryName.includes("exclusive") || 
-               categoryName.includes("exlusive") ||
-               gameName.includes("exclusive") ||
-               gameName.includes("exlusive");
-      });
-      
-      setExclusiveGames(exclusiveGamesData);
-      setProviders([]);
     } catch (error) {
-      console.error("Error fetching exclusive games:", error);
-      setExclusiveGames([]);
+      console.error("Error fetching menu games:", error);
+      setMenuGames([]);
     }
   };
 
@@ -377,9 +350,9 @@ const CategoryContent = () => {
     setActiveCategory(category);
     setContentLoading(true);
     
-    // Check if this is the Exclusive category (case insensitive)
-    if (category.name.toLowerCase() === "exclusive") {
-      await fetchExclusiveGames();
+    // Check if this is the Sports category (case insensitive)
+    if (category.name.toLowerCase() === "sports") {
+      await fetchMenuGames();
     } else {
       await fetchProviders(category.name);
     }
@@ -397,20 +370,14 @@ const CategoryContent = () => {
   // Handle game click - Direct navigation to game page
   const handleGameClick = (game) => {
     setSelectedGame(game);
-    console.log("Selected game:", game);
-    
+ console.log(game)
     // Check if user is logged in
     if (!user) {
       setShowLoginPopup(true);
       return;
     }
-    
     // If user is logged in, navigate directly to game
-    if (game.gameApiID || game.gameId) {
-      navigate(`/game/${game.gameApiID || game.gameId}`);
-    } else {
-      toast.error("Game ID not found");
-    }
+    navigate(`/game/${game.gameId}`);
   };
 
   // Handle opening the game
@@ -428,12 +395,7 @@ const CategoryContent = () => {
       setGameLoading(true);
       
       // Direct navigation to game page
-      const gameId = game.gameApiID || game.gameId;
-      if (gameId) {
-        navigate(`/game/${gameId}`);
-      } else {
-        toast.error("Game ID not found");
-      }
+      navigate(`/game/${game.gameApiID}`);
       
     } catch (err) {
       console.error("Error:", err);
@@ -457,11 +419,10 @@ const CategoryContent = () => {
 
   const handleShowMore = () => {
     const nextPage = gamesPage + 1;
-    const gamesPerLoad = calculateGamesPerPage();
-    const nextGames = exclusiveGames.slice(0, gamesPerLoad * nextPage);
+    const nextGames = menuGames.slice(0, 20 * nextPage);
     setDisplayedGames(nextGames);
     setGamesPage(nextPage);
-    setHasMoreGames(exclusiveGames.length > nextGames.length);
+    setHasMoreGames(menuGames.length > nextGames.length);
   };
 
   const scrollPrev = useCallback(() => {
@@ -486,34 +447,18 @@ const CategoryContent = () => {
     };
   }, [showLoginPopup]);
 
-  // Get game image URL
-  const getGameImageUrl = (game) => {
-    if (!game) return '';
-    
-    const imagePath = game.portraitImage || game.image || game.thumbnail || '';
-    if (!imagePath) return '';
-    
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    }
-    
-    // Remove leading slash if present to avoid double slash
-    const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-    return `${base_url}/${cleanPath}`;
-  };
-
   // Render provider grid based on the number of providers
   const renderProviderGrid = () => {
     // Show skeleton loading for content
     if (contentLoading) {
       return (
         <ContentSkeleton 
-          isExclusiveCategory={activeCategory?.name.toLowerCase() === "exclusive"}
+          isSportsCategory={activeCategory?.name.toLowerCase() === "sports"}
         />
       );
     }
 
-    if (providers.length === 0 && exclusiveGames.length === 0) {
+    if (providers.length === 0 && menuGames.length === 0) {
       return (
         <div className="p-4 text-center text-[13px] text-white">
           No content found for this category.
@@ -521,58 +466,47 @@ const CategoryContent = () => {
       );
     }
 
-    // Check if active category is Exclusive (case insensitive)
-    const isExclusiveCategory = activeCategory?.name.toLowerCase() === "exclusive";
+    // Check if active category is Sports (case insensitive)
+    const isSportsCategory = activeCategory?.name.toLowerCase() === "sports";
 
-    if (isExclusiveCategory) {
-      // Render exclusive games in a responsive grid with portrait images
+    if (isSportsCategory) {
+      // Render menu games in a responsive grid
       return (
         <div className="px-2 md:p-4">
-          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+          <div className="grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
             {displayedGames.map((game) => (
               <div
-                key={game._id || game.gameId}
-                className="flex flex-col items-center rounded-[8px] overflow-hidden transition-all cursor-pointer hover:border-theme_color hover:shadow-lg group"
+                key={game._id}
+                className="flex flex-col items-center md:flex-row bg-[#2A3254] rounded-[8px] border-[1px] border-gray-700 px-[10px] py-3 overflow-hidden transition-all cursor-pointer relative group"
                 onClick={() => handleGameClick(game)}
               >
-                {/* Game Image Container with fixed aspect ratio */}
-                <div className="game-image-container w-full mb-2">
                   <img
-                    src={getGameImageUrl(game)}
-                    alt={game.name || game.gameName}
-                    className="game-image rounded-[6px] transition-transform duration-300 group-hover:scale-105"
-                    onError={(e) => {
-                      e.target.src = "https://via.placeholder.com/100x133?text=Game";
-                    }}
+                    src={`${base_url}/${game.portraitImage || game.image || ''}`}
+                    alt={game.name}
+                    className="w-[50px] h-[50px] transition-transform duration-300 group-hover:scale-105"
                   />
+                <div className="pt-2 w-full">
+                  <p className="text-white text-[12px] uppercase text-center truncate">{game.name}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* More Button - Only show if there are more games to load */}
-          {hasMoreGames && displayedGames.length > 0 && (
-            <div className="flex justify-center mt-8 mb-4">
+          {hasMoreGames && (
+            <div className="flex justify-center mt-4">
               <button
-                className="px-8 py-3 bg-theme_color hover:bg-theme_color/90 text-white text-sm font-medium rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-theme_color/30"
+                className="px-6 py-2 bg-theme_color cursor-pointer text-white text-sm rounded"
                 onClick={handleShowMore}
               >
-                More Games
+                More
               </button>
-            </div>
-          )}
-
-          {/* Show message if no games found */}
-          {displayedGames.length === 0 && exclusiveGames.length === 0 && !contentLoading && (
-            <div className="text-center py-8 text-gray-400">
-              No exclusive games found.
             </div>
           )}
         </div>
       );
     }
 
-    // Render providers grid for non-exclusive categories
+    // Render providers grid for non-sports categories
     return (
       <div className="px-2 md:p-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3">
@@ -599,14 +533,13 @@ const CategoryContent = () => {
     <>
       <style>
         {`
-          /* Force consistent image size and aspect ratio - Portrait 3:4 */
+          /* Force consistent image size and aspect ratio */
           .game-image-container {
             position: relative;
             width: 100%;
             height: 0;
-            padding-bottom: 133.33%; /* 3:4 aspect ratio (portrait) */
+            padding-bottom: 133.33%; /* 3:4 aspect ratio */
             overflow: hidden;
-            border-radius: 6px;
           }
           
           .game-image {
@@ -631,15 +564,6 @@ const CategoryContent = () => {
           .animate-pulse {
             animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
           }
-
-          /* Custom scrollbar hide for mobile */
-          .hidescrollbar::-webkit-scrollbar {
-            display: none;
-          }
-          .hidescrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
         `}
       </style>
 
@@ -649,7 +573,7 @@ const CategoryContent = () => {
       ) : (
         <>
           {/* Mobile slider for categories using Embla Carousel */}
-          <div className="block lg:hidden px-2 py-4 md:p-4 pt-[30px]  md:pt-[40px] relative hidescrollbar">
+          <div className="block lg:hidden px-2 py-4 md:p-4 pt-[40px] relative hidescrollbar">
             <div className="embla" ref={emblaRef}>
               <div className="embla__container flex gap-3">
                 {categories.map((category) => (
@@ -715,7 +639,7 @@ const CategoryContent = () => {
         </>
       )}
 
-      {/* Content area (providers or exclusive games) */}
+      {/* Content area (providers or menu games) */}
       {renderProviderGrid()}
 
       {/* Login Popup */}
