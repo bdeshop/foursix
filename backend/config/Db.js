@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect("mongodb+srv://devdoppp_db_user:Q1xydhO2nJh1HMoA@cluster0.w5jx7gp.mongodb.net/?appName=Cluster0", {
+    const conn = await mongoose.connect("mongodb://127.0.0.1:27017/foursixbackend", {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

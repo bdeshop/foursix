@@ -11,6 +11,7 @@ import Featured from "../../components/home_componets/featured/Featured";
 import logo from "../../assets/logo.png";
 import axios from 'axios';
 import { Mobileslider } from "../../components/home_componets/Mobileslider";
+import Exclusivegames from "../../components/home_componets/exclusive/Exclusivegames";
 
 // Create Auth Context
 const AuthContext = createContext();
@@ -533,7 +534,9 @@ const HomeContent = () => {
 
               {/* Providers Section */}
               <ProviderSlider />
-
+              {/* ---------exclusive-games----- */}
+                  <Exclusivegames/>
+               {/* ---------exclusive-games----- */}
               {/* Events Section */}
               <Event />
 

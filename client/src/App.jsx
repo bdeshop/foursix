@@ -434,6 +434,7 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+            
             {/* Catch all route - redirect to home */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

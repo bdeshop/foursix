@@ -756,4 +756,19 @@ router.get("/banners/computer", async (req, res) => {
     });
   }
 });
+
+router.get("/exclusive-games", async (req, res) => {
+  try {
+    const exclusive_games=await Game.find({category:"exclusive",status:true});
+    console.log(exclusive_games)
+    if(!exclusive_games){
+          res.send({success:false,message:"exclusive games not found!"})
+    }
+    res.json(exclusive_games);
+  } catch (error) {
+    console.error("Error fetching exclusive games:", error);
+    res.status(500).json({ error: "Failed to fetch exclusive games" });
+  }
+});
+
 module.exports = router;
