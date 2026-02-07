@@ -845,7 +845,7 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
                     </span>
                   </div>
                   <button
-                    className="px-3 py-1.5 hover:bg-[#444] cursor-pointer text-white transition-colors duration-200 border-l border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-2 py-1.5 hover:bg-[#444] cursor-pointer text-white transition-colors duration-200 border-l border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={refreshBalance}
                     disabled={isRefreshingBalance}
                     aria-label="Refresh balance"
