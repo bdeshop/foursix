@@ -845,7 +845,7 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
                     </span>
                   </div>
                   <button
-                    className="px-3 py-2 hover:bg-[#444] cursor-pointer text-white transition-colors duration-200 border-l border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 hover:bg-[#444] cursor-pointer text-white transition-colors duration-200 border-l border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={refreshBalance}
                     disabled={isRefreshingBalance}
                     aria-label="Refresh balance"
@@ -854,7 +854,14 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
                       className={`w-4 h-4 ${isRefreshingBalance ? 'animate-spin' : ''}`}
                     />
                   </button>
+                  
                 </div>
+                  <NavLink
+    to="/member/withdraw"
+    className="text-white text-[12px] px-3 py-2 border-[1px] cursor-pointer border-gray-700 rounded hover:bg-[#333] transition-all duration-200"
+  >
+    Withdraw
+  </NavLink>
                 <NavLink
                   to="/member/deposit"
                   className="bg-theme_color text-[12px] px-3 py-2 rounded-[3px] hover:bg-theme_color/80 transition-all duration-200 cursor-pointer font-medium text-white"
