@@ -11,7 +11,14 @@ import {
   FaExclamationTriangle,
   FaCopy,
   FaWallet,
-  FaMobileAlt
+  FaMobileAlt,
+  FaIdCard,
+  FaUpload,
+  FaSpinner,
+  FaCheck,
+  FaCamera,
+  FaInfoCircle,
+  FaLock
 } from 'react-icons/fa';
 import { FaBangladeshiTakaSign } from "react-icons/fa6";
 import Header from '../../components/Header';
@@ -30,6 +37,20 @@ const Payout = () => {
   const [selectedPayout, setSelectedPayout] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [activeTab, setActiveTab] = useState('history');
+  const [kycData, setKycData] = useState(null);
+  const [showKycUploadModal, setShowKycUploadModal] = useState(false);
+  const [isUploadingKyc, setIsUploadingKyc] = useState(false);
+  
+  // KYC upload state
+  const [kycImages, setKycImages] = useState({
+    front: null,
+    back: null
+  });
+  
+  const [uploadProgress, setUploadProgress] = useState({
+    front: 0,
+    back: 0
+  });
 
   // Fixed payment methods (4 methods)
   const fixedPaymentMethods = [
@@ -96,9 +117,10 @@ const Payout = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // Load payout data
+  // Load payout data and KYC status
   useEffect(() => {
     loadPayoutData();
+    loadKycStatus();
   }, []);
 
   const loadPayoutData = async () => {
@@ -139,6 +161,34 @@ const Payout = () => {
     }
   };
 
+  const loadKycStatus = async () => {
+    try {
+      const token = localStorage.getItem('affiliatetoken');
+      const response = await axios.get(`${base_url}/api/affiliate/kyc/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setKycData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading KYC status:', error);
+      // Don't show error toast here, just set default values
+      setKycData({
+        kycverified: false,
+        kycStatus: 'pending',
+        kycFrontImage: null,
+        kycBackImage: null,
+        canWithdraw: false,
+        requirements: {
+          frontImageRequired: true,
+          backImageRequired: true,
+          bothRequired: true
+        }
+      });
+    }
+  };
+
   const calculatePayoutStats = (history, profile) => {
     const payouts = history.payouts || [];
     const completedPayouts = payouts.filter(p => p.status === 'completed');
@@ -155,7 +205,9 @@ const Payout = () => {
       largestPayout: largestPayout,
       availableForPayout: profile.pendingEarnings || 0,
       minimumPayout: profile.minimumPayout || 1000,
-      canRequestPayout: (profile.pendingEarnings || 0) >= (profile.minimumPayout || 1000)
+      canRequestPayout: (profile.pendingEarnings || 0) >= (profile.minimumPayout || 1000) && 
+                       kycData?.kycverified && 
+                       kycData?.kycStatus === 'approved'
     };
   };
 
@@ -218,8 +270,150 @@ const Payout = () => {
     );
   };
 
+  const getKycStatusBadge = (status) => {
+    const statusConfig = {
+      approved: { 
+        color: 'bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-400 border border-green-500/30', 
+        icon: FaCheckCircle,
+        label: 'Approved'
+      },
+      pending: { 
+        color: 'bg-gradient-to-r from-amber-500/20 to-yellow-600/20 text-amber-400 border border-amber-500/30', 
+        icon: FaClock,
+        label: 'Pending'
+      },
+      rejected: { 
+        color: 'bg-gradient-to-r from-red-500/20 to-pink-600/20 text-red-400 border border-red-500/30', 
+        icon: FaTimesCircle,
+        label: 'Rejected'
+      }
+    };
+    
+    const config = statusConfig[status] || statusConfig.pending;
+    const IconComponent = config.icon;
+    
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${config.color}`}>
+        <IconComponent className="w-3 h-3 mr-1" />
+        {config.label}
+      </span>
+    );
+  };
+
+  // Check if KYC can be uploaded
+  const canUploadKyc = () => {
+    // Can upload if KYC is rejected or if no KYC data exists
+    if (!kycData) return true;
+    return kycData.kycStatus === 'rejected' || 
+           (!kycData.kycFrontImage && !kycData.kycBackImage) ||
+           (kycData.kycStatus !== 'pending' && kycData.kycStatus !== 'approved');
+  };
+
+  // Handle KYC image upload
+  const handleImageSelect = (e, imageType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please upload JPEG, PNG, or GIF images.');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size too large. Maximum size is 5MB.');
+      return;
+    }
+
+    // Preview image
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setKycImages(prev => ({
+        ...prev,
+        [imageType]: {
+          file,
+          preview: e.target.result
+        }
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadKyc = async () => {
+    if (!kycImages.front && !kycImages.back) {
+      toast.error('Please upload at least one KYC image');
+      return;
+    }
+
+    try {
+      setIsUploadingKyc(true);
+      setUploadProgress({ front: 0, back: 0 });
+
+      const token = localStorage.getItem('affiliatetoken');
+      const formData = new FormData();
+
+      if (kycImages.front?.file) {
+        formData.append('frontImage', kycImages.front.file);
+      }
+      if (kycImages.back?.file) {
+        formData.append('backImage', kycImages.back.file);
+      }
+
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => ({
+          front: prev.front < 90 ? prev.front + 10 : 90,
+          back: prev.back < 90 ? prev.back + 10 : 90
+        }));
+      }, 300);
+
+      const response = await axios.post(`${base_url}/api/affiliate/kyc/upload`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress({
+            front: progress,
+            back: progress
+          });
+        }
+      });
+
+      clearInterval(progressInterval);
+      setUploadProgress({ front: 100, back: 100 });
+
+      if (response.data.success) {
+        toast.success('KYC images uploaded successfully!');
+        setShowKycUploadModal(false);
+        setKycImages({ front: null, back: null });
+        await loadKycStatus();
+        
+        // Reload after 2 seconds to show updated status
+        setTimeout(() => {
+          loadKycStatus();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('KYC upload error:', error);
+      toast.error(error.response?.data?.message || 'Failed to upload KYC images');
+    } finally {
+      setIsUploadingKyc(false);
+      setUploadProgress({ front: 0, back: 0 });
+    }
+  };
+
   const handlePayoutRequest = async (e) => {
     e.preventDefault();
+    
+    // Check KYC verification
+    if (!kycData?.kycverified || kycData?.kycStatus !== 'approved') {
+      toast.error('Please complete KYC verification before requesting payout');
+      return;
+    }
     
     if (isSubmitting) return;
     
@@ -363,7 +557,92 @@ const Payout = () => {
     return matchesSearch && matchesStatus;
   }) || [];
 
-  const canRequestPayout = payoutData.availableBalance >= payoutData.minimumPayout;
+  const canRequestPayout = payoutData.availableBalance >= payoutData.minimumPayout && 
+                          kycData?.kycverified && 
+                          kycData?.kycStatus === 'approved';
+
+  // KYC Verification Alert Component
+  const KYCVerificationAlert = () => {
+    if (kycData?.kycverified && kycData?.kycStatus === 'approved') {
+      return null; // Don't show alert if KYC is verified
+    }
+
+    return (
+      <div className="mb-8">
+        <div className={`rounded-xl p-6 ${
+          kycData?.kycStatus === 'pending' 
+            ? 'bg-amber-500/10 border border-amber-500/20' 
+            : kycData?.kycStatus === 'rejected'
+            ? 'bg-red-500/10 border border-red-500/20'
+            : 'bg-cyan-500/10 border border-cyan-500/20'
+        }`}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-white/10 rounded-lg">
+                {kycData?.kycStatus === 'pending' ? (
+                  <FaClock className="text-2xl text-amber-400" />
+                ) : kycData?.kycStatus === 'rejected' ? (
+                  <FaTimesCircle className="text-2xl text-red-400" />
+                ) : (
+                  <FaIdCard className="text-2xl text-cyan-400" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold uppercase tracking-widest">
+                  {kycData?.kycStatus === 'pending' 
+                    ? 'KYC Verification Pending'
+                    : kycData?.kycStatus === 'rejected'
+                    ? 'KYC Verification Rejected'
+                    : 'KYC Verification Required'
+                  }
+                </h3>
+                <p className="text-gray-400 mt-1">
+                  {kycData?.kycStatus === 'pending' 
+                    ? 'Your KYC documents are under review. You cannot withdraw funds until approved.'
+                    : kycData?.kycStatus === 'rejected'
+                    ? 'Your KYC documents were rejected. Please upload valid documents.'
+                    : 'You need to complete KYC verification to withdraw funds.'
+                  }
+                </p>
+                {kycData?.kycStatus === 'rejected' && (
+                  <p className="text-sm text-red-300 mt-2">
+                    Please check your email for rejection reasons or contact support.
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowKycUploadModal(true)}
+              disabled={!canUploadKyc()}
+              className={`mt-4 lg:mt-0 px-6 py-3 rounded-lg text-sm font-bold uppercase tracking-widest ${
+                canUploadKyc()
+                  ? 'bg-cyan-500 text-black hover:bg-cyan-600'
+                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {kycData?.kycStatus === 'pending' 
+                ? 'View Status' 
+                : canUploadKyc() 
+                ? 'Upload KYC' 
+                : 'KYC Uploaded'
+              }
+            </button>
+          </div>
+          
+          {kycData?.kycStatus === 'pending' && (
+            <div className="mt-4 p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <FaInfoCircle className="text-amber-400" />
+                <p className="text-sm text-amber-300">
+                  KYC verification usually takes 24-48 hours. Please be patient. You cannot upload new documents while under review.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -413,6 +692,11 @@ const Payout = () => {
                 </p>
               </div>
               <div className="flex items-center space-x-4 mt-4 lg:mt-0">
+                {/* KYC Status Badge */}
+                <div className="hidden md:block">
+                  {getKycStatusBadge(kycData?.kycStatus || 'pending')}
+                </div>
+                
                 <button
                   onClick={() => setShowRequestModal(true)}
                   disabled={!canRequestPayout}
@@ -427,6 +711,9 @@ const Payout = () => {
               </div>
             </div>
           </div>
+
+          {/* KYC Verification Alert */}
+          <KYCVerificationAlert />
 
           {/* Notice */}
           <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 mb-8">
@@ -508,23 +795,38 @@ const Payout = () => {
                   <h3 className="text-xl font-bold uppercase tracking-widest">
                     {canRequestPayout
                       ? 'Ready for Payout!'
+                      : !kycData?.kycverified
+                      ? 'KYC Verification Required'
+                      : kycData?.kycStatus === 'pending'
+                      ? 'KYC Verification Pending'
                       : 'Minimum Not Reached'
                     }
                   </h3>
                   <p className="text-gray-400">
                     {canRequestPayout
                       ? `You can request up to ${formatCurrency(payoutData.availableBalance)}`
+                      : !kycData?.kycverified
+                      ? 'Complete KYC verification to withdraw funds'
+                      : kycData?.kycStatus === 'pending'
+                      ? 'Your KYC documents are under review'
                       : `You need ${formatCurrency(payoutData.minimumPayout - payoutData.availableBalance)} more to request a payout`
                     }
                   </p>
                 </div>
               </div>
-              {canRequestPayout && (
+              {canRequestPayout ? (
                 <button
                   onClick={() => setShowRequestModal(true)}
                   className="mt-4 lg:mt-0 px-6 py-3 bg-cyan-500 text-black rounded-lg text-sm font-bold uppercase tracking-widest hover:bg-cyan-600"
                 >
                   Request Payout Now
+                </button>
+              ) : (!kycData?.kycverified || kycData?.kycStatus === 'rejected') && canUploadKyc() && (
+                <button
+                  onClick={() => setShowKycUploadModal(true)}
+                  className="mt-4 lg:mt-0 px-6 py-3 bg-cyan-500 text-black rounded-lg text-sm font-bold uppercase tracking-widest hover:bg-cyan-600"
+                >
+                  {kycData?.kycStatus === 'rejected' ? 'Re-upload KYC' : 'Upload KYC'}
                 </button>
               )}
             </div>
@@ -752,12 +1054,14 @@ const Payout = () => {
                         >
                           Request Payout
                         </button>
-                        <button
-                          onClick={() => toast.success('Export feature coming soon!')}
-                          className="w-full px-4 py-2 border border-white/10 text-gray-300 rounded-lg hover:bg-white/5 font-bold uppercase tracking-widest text-sm"
-                        >
-                          Export History
-                        </button>
+                        {canUploadKyc() && (
+                          <button
+                            onClick={() => setShowKycUploadModal(true)}
+                            className="w-full px-4 py-2 border border-white/10 text-gray-300 rounded-lg hover:bg-white/5 font-bold uppercase tracking-widest text-sm"
+                          >
+                            {kycData?.kycStatus === 'rejected' ? 'Re-upload KYC' : 'Upload KYC'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -767,6 +1071,327 @@ const Payout = () => {
           </div>
         </main>
       </div>
+
+      {/* KYC Upload Modal */}
+      {showKycUploadModal && (
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.4)] backdrop-blur-md flex items-center justify-center z-[10000] p-4">
+          <div className="bg-[#000514] border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <FaIdCard className="text-cyan-400 text-2xl" />
+                  <h3 className="text-xl font-bold uppercase tracking-widest text-white">KYC Verification</h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowKycUploadModal(false);
+                    setKycImages({ front: null, back: null });
+                  }}
+                  className="text-gray-400 hover:text-gray-300"
+                >
+                  <FaTimesCircle className="text-xl" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Current KYC Status */}
+              <div className="mb-8">
+                <h4 className="text-lg font-bold uppercase tracking-widest mb-4 text-gray-300">Current Status</h4>
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-1">KYC Status</p>
+                      <div className="flex items-center space-x-2">
+                        {getKycStatusBadge(kycData?.kycStatus || 'pending')}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-1">Verification</p>
+                      <p className="text-sm">
+                        {kycData?.kycverified ? (
+                          <span className="text-green-400 flex items-center">
+                            <FaCheckCircle className="mr-2" /> Verified
+                          </span>
+                        ) : (
+                          <span className="text-amber-400 flex items-center">
+                            <FaClock className="mr-2" /> Not Verified
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending KYC Notice */}
+              {kycData?.kycStatus === 'pending' && (
+                <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <FaLock className="text-amber-400 text-xl" />
+                    <div>
+                      <h5 className="text-lg font-bold text-amber-400 mb-1">KYC Under Review</h5>
+                      <p className="text-amber-300 text-sm">
+                        Your KYC documents are currently under review. You cannot upload new documents while your application is being processed.
+                      </p>
+                      <p className="text-amber-200 text-sm mt-2">
+                        Verification usually takes 24-48 hours. Please be patient.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rejected KYC Notice */}
+              {kycData?.kycStatus === 'rejected' && (
+                <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <FaInfoCircle className="text-red-400 text-xl" />
+                    <div>
+                      <h5 className="text-lg font-bold text-red-400 mb-1">KYC Rejected</h5>
+                      <p className="text-red-300 text-sm">
+                        Your previous KYC documents were rejected. Please upload new, valid documents.
+                      </p>
+                      <p className="text-red-200 text-sm mt-2">
+                        Make sure your documents are clear, valid, and match the requirements below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Instructions */}
+              <div className="mb-8">
+                <h4 className="text-lg font-bold uppercase tracking-widest mb-4 text-gray-300">Upload Requirements</h4>
+                <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4">
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-center space-x-2">
+                      <FaCheck className="text-green-400" />
+                      <span>Upload clear photos of your government-issued ID (NID, Passport, Driving License)</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <FaCheck className="text-green-400" />
+                      <span>Both front and back sides are required for verification</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <FaCheck className="text-green-400" />
+                      <span>File size: Maximum 5MB per image</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <FaCheck className="text-green-400" />
+                      <span>Supported formats: JPG, PNG, GIF, WebP</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Image Upload Section - Only show if can upload */}
+              {canUploadKyc() ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* Front Image Upload */}
+                    <div className="border-2 border-dashed border-white/10 rounded-xl p-6">
+                      <div className="text-center">
+                        <FaCamera className="text-cyan-400 text-3xl mx-auto mb-3" />
+                        <h5 className="text-lg font-bold uppercase tracking-widest mb-2">Front Side</h5>
+                        <p className="text-gray-400 text-sm mb-4">Upload the front of your ID</p>
+                        
+                        {kycImages.front ? (
+                          <div className="mb-4">
+                            <img 
+                              src={kycImages.front.preview} 
+                              alt="Front ID Preview" 
+                              className="w-full h-48 object-contain rounded-lg mb-3"
+                            />
+                            <p className="text-xs text-gray-400">
+                              {kycImages.front.file.name} ({Math.round(kycImages.front.file.size / 1024)}KB)
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="h-48 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-4">
+                            <span className="text-gray-500">No image selected</span>
+                          </div>
+                        )}
+                        
+                        <label className="block">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleImageSelect(e, 'front')}
+                            className="hidden"
+                          />
+                          <div className="px-4 py-2 bg-cyan-500 text-black rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-cyan-600 cursor-pointer">
+                            Choose Front Image
+                          </div>
+                        </label>
+                        
+                        {/* Upload Progress */}
+                        {uploadProgress.front > 0 && (
+                          <div className="mt-3">
+                            <div className="flex justify-between text-xs text-gray-400 mb-1">
+                              <span>Uploading...</span>
+                              <span>{uploadProgress.front}%</span>
+                            </div>
+                            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-cyan-500 transition-all duration-300"
+                                style={{ width: `${uploadProgress.front}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Back Image Upload */}
+                    <div className="border-2 border-dashed border-white/10 rounded-xl p-6">
+                      <div className="text-center">
+                        <FaCamera className="text-cyan-400 text-3xl mx-auto mb-3" />
+                        <h5 className="text-lg font-bold uppercase tracking-widest mb-2">Back Side</h5>
+                        <p className="text-gray-400 text-sm mb-4">Upload the back of your ID</p>
+                        
+                        {kycImages.back ? (
+                          <div className="mb-4">
+                            <img 
+                              src={kycImages.back.preview} 
+                              alt="Back ID Preview" 
+                              className="w-full h-48 object-contain rounded-lg mb-3"
+                            />
+                            <p className="text-xs text-gray-400">
+                              {kycImages.back.file.name} ({Math.round(kycImages.back.file.size / 1024)}KB)
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="h-48 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center mb-4">
+                            <span className="text-gray-500">No image selected</span>
+                          </div>
+                        )}
+                        
+                        <label className="block">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleImageSelect(e, 'back')}
+                            className="hidden"
+                          />
+                          <div className="px-4 py-2 bg-cyan-500 text-black rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-cyan-600 cursor-pointer">
+                            Choose Back Image
+                          </div>
+                        </label>
+                        
+                        {/* Upload Progress */}
+                        {uploadProgress.back > 0 && (
+                          <div className="mt-3">
+                            <div className="flex justify-between text-xs text-gray-400 mb-1">
+                              <span>Uploading...</span>
+                              <span>{uploadProgress.back}%</span>
+                            </div>
+                            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-cyan-500 transition-all duration-300"
+                                style={{ width: `${uploadProgress.back}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Current Uploaded Images (if any) */}
+                  {kycData?.kycFrontImage || kycData?.kycBackImage ? (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-bold uppercase tracking-widest mb-4 text-gray-300">Currently Uploaded Images</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {kycData?.kycFrontImage && (
+                          <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                            <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">Front Image</p>
+                            <div className="h-32 bg-white/5 rounded-lg flex items-center justify-center">
+                              <span className="text-gray-400">Uploaded ✓</span>
+                            </div>
+                          </div>
+                        )}
+                        {kycData?.kycBackImage && (
+                          <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                            <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">Back Image</p>
+                            <div className="h-32 bg-white/5 rounded-lg flex items-center justify-center">
+                              <span className="text-gray-400">Uploaded ✓</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                    <button
+                      onClick={handleUploadKyc}
+                      disabled={isUploadingKyc || (!kycImages.front && !kycImages.back)}
+                      className={`flex-1 px-6 py-3 rounded-lg font-bold uppercase tracking-widest text-sm ${
+                        isUploadingKyc
+                          ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                          : (!kycImages.front && !kycImages.back)
+                          ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                          : 'bg-cyan-500 text-black hover:bg-cyan-600 cursor-pointer'
+                      }`}
+                    >
+                      {isUploadingKyc ? (
+                        <div className="flex items-center justify-center">
+                          <FaSpinner className="animate-spin mr-2" />
+                          Uploading...
+                        </div>
+                      ) : (
+                        kycData?.kycStatus === 'rejected' ? 'Re-upload KYC Documents' : 'Upload KYC Documents'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowKycUploadModal(false);
+                        setKycImages({ front: null, back: null });
+                      }}
+                      className="flex-1 px-6 py-3 bg-gray-700 text-white rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* If cannot upload (pending status) */
+                <div className="text-center py-8">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg inline-block">
+                    <FaClock className="text-amber-400 text-4xl mx-auto mb-4" />
+                    <h4 className="text-xl font-bold text-amber-400 mb-2">KYC Under Review</h4>
+                    <p className="text-gray-300 mb-4">
+                      Your KYC documents are currently being reviewed. You cannot upload new documents at this time.
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Please check back in 24-48 hours for the verification result.
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowKycUploadModal(false)}
+                    className="mt-6 px-6 py-3 bg-gray-700 text-white rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-gray-600"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+
+              {/* Verification Notice */}
+              <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <FaClock className="text-amber-400" />
+                  <p className="text-sm text-amber-300">
+                    After uploading your KYC documents, verification usually takes 24-48 hours. You will be notified once your KYC is approved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payout Request Modal */}
       {showRequestModal && (
@@ -793,6 +1418,18 @@ const Payout = () => {
             </div>
 
             <form onSubmit={handlePayoutRequest} className="p-6 space-y-4">
+              {/* KYC Verification Notice */}
+              {!kycData?.kycverified && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <FaTimesCircle className="text-red-400" />
+                    <p className="text-sm text-red-300">
+                      KYC verification is required before requesting payout.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">
                   Payout Amount (BDT)
@@ -809,6 +1446,7 @@ const Payout = () => {
                     max={payoutData.availableBalance}
                     step="0.01"
                     required
+                    disabled={!kycData?.kycverified}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
@@ -831,6 +1469,7 @@ const Payout = () => {
                   }}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-white"
                   required
+                  disabled={!kycData?.kycverified}
                 >
                   {fixedPaymentMethods.map(method => (
                     <option key={method.id} value={method.id}>
@@ -859,6 +1498,7 @@ const Payout = () => {
                     placeholder={fixedPaymentMethods.find(m => m.id === payoutRequest.paymentMethod)?.placeholder || 'Enter payment details'}
                     className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-white"
                     required
+                    disabled={!kycData?.kycverified}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
@@ -879,16 +1519,28 @@ const Payout = () => {
                   placeholder="Any additional notes for this payout request..."
                   rows="3"
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-white placeholder-gray-500"
+                  disabled={!kycData?.kycverified}
                 />
               </div>
 
               <div className="flex space-x-3 pt-4">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 px-6 py-3 bg-cyan-500 text-black rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || !kycData?.kycverified}
+                  className={`flex-1 px-6 py-3 rounded-lg font-bold uppercase tracking-widest text-sm ${
+                    !kycData?.kycverified
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : isSubmitting
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-cyan-500 text-black hover:bg-cyan-600 cursor-pointer'
+                  }`}
                 >
-                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                  {!kycData?.kycverified 
+                    ? 'KYC Required'
+                    : isSubmitting 
+                    ? 'Submitting...'
+                    : 'Submit Request'
+                  }
                 </button>
                 <button
                   type="button"

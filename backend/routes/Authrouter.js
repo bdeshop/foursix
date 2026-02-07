@@ -215,8 +215,6 @@ Authrouter.post("/affiliate/register", async (req, res) => {
       promoMethod: promoMethod || 'other',
       paymentMethod: paymentMethod || 'bkash',
       paymentDetails: dbPaymentDetails,
-      status: 'pending',
-      verificationStatus: 'unverified'
     });
 
     await affiliate.save();

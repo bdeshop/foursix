@@ -478,31 +478,6 @@ const FeaturedContent = () => {
                   className="featured-image"
                 />
 
-                {/* Play Button - Always visible on mobile, on hover for desktop */}
-                <div
-                  className={`absolute inset-0 flex items-center justify-center md:bg-[rgba(0,0,0,0.2)] bg-opacity-40 transition-opacity duration-300 ${
-                    isMobile
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  }`}
-                >
-                  <div className="bg-theme_color p-3 rounded-full">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="lucide lucide-play"
-                    >
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                  </div>
-                </div>
               </div>
             </div>
           ))}

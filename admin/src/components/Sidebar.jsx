@@ -410,10 +410,10 @@ const Sidebar = ({ isOpen }) => {
               count: affiliateCounts.pendingPayouts,
               type: 'warning'
             },
-            // { 
-            //   to: '/affiliates/set-affilaite-payout-amount', 
-            //   text: 'Payout Settings'
-            // },
+            { 
+              to: '/affiliates/kyc-managemnet', 
+              text: 'KYC Management'
+            },
           ],
         },
         {

@@ -3054,4 +3054,437 @@ Affiliateroute.put("/admin/payouts/bulk-status", async (req, res) => {
     });
   }
 });
+
+
+// ==================== MULTER CONFIGURATION ====================
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Create directory if it doesn't exist
+    const uploadDir = './public/uploads/kyc/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const affiliateId = req.affiliateId;
+    const timestamp = Date.now();
+    const imageType = req.body.imageType || 'general';
+    const ext = path.extname(file.originalname);
+    const filename = `kyc_${affiliateId}_${imageType}_${timestamp}${ext}`;
+    cb(null, filename);
+  }
+});
+
+// File filter for images only
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPEG, JPG, PNG, GIF, and WebP images are allowed.'), false);
+  }
+};
+
+// Configure multer
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 2 // Maximum 2 files
+  }
+});
+
+// ==================== KYC UPLOAD ROUTES ====================
+
+// Upload KYC images using Multer (both front and back)
+Affiliateroute.post("/kyc/upload", authenticateAffiliate, upload.fields([
+  { name: 'frontImage', maxCount: 1 },
+  { name: 'backImage', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    // Check if files were uploaded
+    if (!req.files || (!req.files['frontImage'] && !req.files['backImage'])) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one image (front or back) is required"
+      });
+    }
+
+    const affiliate = await Affiliate.findById(req.affiliateId);
+    if (!affiliate) {
+      // Clean up uploaded files if affiliate not found
+      if (req.files['frontImage']) {
+        fs.unlinkSync(req.files['frontImage'][0].path);
+      }
+      if (req.files['backImage']) {
+        fs.unlinkSync(req.files['backImage'][0].path);
+      }
+      
+      return res.status(404).json({
+        success: false,
+        message: "Affiliate not found"
+      });
+    }
+
+    // Process uploaded files
+    const uploadedImages = {};
+
+    // Handle front image
+    if (req.files['frontImage']) {
+      const frontImage = req.files['frontImage'][0];
+      uploadedImages.front = {
+        filename: frontImage.filename,
+        path: frontImage.path,
+        size: frontImage.size,
+        mimetype: frontImage.mimetype,
+        // Create URL for the uploaded file (adjust based on your server configuration)
+        url: `${req.protocol}://${req.get('host')}/uploads/kyc/${frontImage.filename}`
+      };
+      
+      // Update affiliate's KYC front image
+      affiliate.kycFrontImage = uploadedImages.front.url;
+    }
+
+    // Handle back image
+    if (req.files['backImage']) {
+      const backImage = req.files['backImage'][0];
+      uploadedImages.back = {
+        filename: backImage.filename,
+        path: backImage.path,
+        size: backImage.size,
+        mimetype: backImage.mimetype,
+        url: `${req.protocol}://${req.get('host')}/uploads/kyc/${backImage.filename}`
+      };
+      
+      // Update affiliate's KYC back image
+      affiliate.kycBackImage = uploadedImages.back.url;
+    }
+
+    // Update KYC status
+    affiliate.kycStatus = 'pending';
+    affiliate.kycverified = false;
+    
+    await affiliate.save();
+
+    // Prepare response
+    const responseData = {
+      kycStatus: affiliate.kycStatus,
+      kycverified: affiliate.kycverified,
+      uploadedAt: new Date(),
+      images: []
+    };
+
+    if (uploadedImages.front) {
+      responseData.images.push({
+        type: 'front',
+        url: uploadedImages.front.url,
+        filename: uploadedImages.front.filename,
+        size: uploadedImages.front.size
+      });
+    }
+
+    if (uploadedImages.back) {
+      responseData.images.push({
+        type: 'back',
+        url: uploadedImages.back.url,
+        filename: uploadedImages.back.filename,
+        size: uploadedImages.back.size
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "KYC images uploaded successfully",
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error("KYC upload error:", error);
+    
+    // Clean up uploaded files on error
+    if (req.files) {
+      Object.values(req.files).forEach(fileArray => {
+        fileArray.forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during KYC upload"
+    });
+  }
+});
+
+// Upload KYC images with cloud storage option (e.g., AWS S3)
+Affiliateroute.post("/kyc/upload-cloud", authenticateAffiliate, upload.fields([
+  { name: 'frontImage', maxCount: 1 },
+  { name: 'backImage', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    // Check if files were uploaded
+    if (!req.files || (!req.files['frontImage'] && !req.files['backImage'])) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one image (front or back) is required"
+      });
+    }
+
+    const affiliate = await Affiliate.findById(req.affiliateId);
+    if (!affiliate) {
+      // Clean up uploaded files
+      Object.values(req.files).forEach(fileArray => {
+        fileArray.forEach(file => {
+          fs.unlinkSync(file.path);
+        });
+      });
+      
+      return res.status(404).json({
+        success: false,
+        message: "Affiliate not found"
+      });
+    }
+
+    // Example with AWS S3 (uncomment and configure as needed)
+    /*
+    const AWS = require('aws-sdk');
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      region: process.env.AWS_REGION
+    });
+    */
+
+    const uploadedImages = {};
+
+    // Process front image
+    if (req.files['frontImage']) {
+      const frontImage = req.files['frontImage'][0];
+      
+      // Local storage URL (comment this out if using cloud storage)
+      uploadedImages.front = {
+        url: `/uploads/kyc/${frontImage.filename}`
+      };
+      
+      /*
+      // AWS S3 upload example
+      const s3Params = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: `kyc/${affiliate._id}/front/${frontImage.filename}`,
+        Body: fs.readFileSync(frontImage.path),
+        ContentType: frontImage.mimetype,
+        ACL: 'private' // or 'public-read'
+      };
+      
+      const s3Upload = await s3.upload(s3Params).promise();
+      uploadedImages.front = {
+        url: s3Upload.Location
+      };
+      
+      // Delete local file after S3 upload
+      fs.unlinkSync(frontImage.path);
+      */
+      
+      affiliate.kycFrontImage = uploadedImages.front.url;
+    }
+
+    // Process back image
+    if (req.files['backImage']) {
+      const backImage = req.files['backImage'][0];
+      
+      // Local storage URL (comment this out if using cloud storage)
+      uploadedImages.back = {
+        url: `/uploads/kyc/${backImage.filename}`
+      };
+      
+      /*
+      // AWS S3 upload example
+      const s3Params = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: `kyc/${affiliate._id}/back/${backImage.filename}`,
+        Body: fs.readFileSync(backImage.path),
+        ContentType: backImage.mimetype,
+        ACL: 'private'
+      };
+      
+      const s3Upload = await s3.upload(s3Params).promise();
+      uploadedImages.back = {
+        url: s3Upload.Location
+      };
+      
+      // Delete local file after S3 upload
+      fs.unlinkSync(backImage.path);
+      */
+      
+      affiliate.kycBackImage = uploadedImages.back.url;
+    }
+
+    // Update KYC status
+    affiliate.kycStatus = 'pending';
+    affiliate.kycverified = false;
+    
+    await affiliate.save();
+
+    // Prepare response
+    const responseData = {
+      kycStatus: affiliate.kycStatus,
+      kycverified: affiliate.kycverified,
+      uploadedAt: new Date(),
+      images: {
+        front: uploadedImages.front ? uploadedImages.front.url : null,
+        back: uploadedImages.back ? uploadedImages.back.url : null
+      }
+    };
+
+    res.json({
+      success: true,
+      message: "KYC images uploaded successfully",
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error("KYC cloud upload error:", error);
+    
+    // Clean up uploaded files on error
+    if (req.files) {
+      Object.values(req.files).forEach(fileArray => {
+        fileArray.forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during KYC upload"
+    });
+  }
+});
+
+// Get KYC status and images
+Affiliateroute.get("/kyc/status", authenticateAffiliate, async (req, res) => {
+  try {
+    const affiliate = await Affiliate.findById(req.affiliateId);
+    
+    if (!affiliate) {
+      return res.status(404).json({
+        success: false,
+        message: "Affiliate not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        kycverified: affiliate.kycverified,
+        kycStatus: affiliate.kycStatus,
+        kycFrontImage: affiliate.kycFrontImage,
+        kycBackImage: affiliate.kycBackImage,
+        canWithdraw: affiliate.kycverified && affiliate.kycStatus === 'approved',
+        requirements: {
+          frontImageRequired: true,
+          backImageRequired: true,
+          bothRequired: true
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Get KYC status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// Delete KYC images
+Affiliateroute.delete("/kyc/delete", authenticateAffiliate, async (req, res) => {
+  try {
+    const { imageType } = req.body; // 'front', 'back', or 'both'
+    
+    if (!imageType || !['front', 'back', 'both'].includes(imageType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid image type (front, back, or both) is required"
+      });
+    }
+
+    const affiliate = await Affiliate.findById(req.affiliateId);
+    if (!affiliate) {
+      return res.status(404).json({
+        success: false,
+        message: "Affiliate not found"
+      });
+    }
+
+    // Helper function to delete file from local storage
+    const deleteLocalFile = (url) => {
+      if (url && url.includes('/uploads/kyc/')) {
+        const filename = url.split('/').pop();
+        const filePath = path.join('uploads/kyc', filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    };
+
+    const deletedImages = [];
+
+    // Delete front image
+    if ((imageType === 'front' || imageType === 'both') && affiliate.kycFrontImage) {
+      deleteLocalFile(affiliate.kycFrontImage);
+      deletedImages.push('front');
+      affiliate.kycFrontImage = null;
+    }
+
+    // Delete back image
+    if ((imageType === 'back' || imageType === 'both') && affiliate.kycBackImage) {
+      deleteLocalFile(affiliate.kycBackImage);
+      deletedImages.push('back');
+      affiliate.kycBackImage = null;
+    }
+
+    // Reset KYC status if both images are deleted
+    if (imageType === 'both' || (!affiliate.kycFrontImage && !affiliate.kycBackImage)) {
+      affiliate.kycStatus = 'pending';
+      affiliate.kycverified = false;
+    }
+
+    await affiliate.save();
+
+    res.json({
+      success: true,
+      message: `KYC ${imageType} image(s) deleted successfully`,
+      data: {
+        deletedImages: deletedImages,
+        kycStatus: affiliate.kycStatus,
+        kycFrontImage: affiliate.kycFrontImage,
+        kycBackImage: affiliate.kycBackImage
+      }
+    });
+
+  } catch (error) {
+    console.error("Delete KYC images error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+
 module.exports = Affiliateroute;

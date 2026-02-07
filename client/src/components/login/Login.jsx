@@ -485,21 +485,6 @@ export default function Login() {
                       disabled={isLoading}
                     />
                   </div>
-
-                  {/* Email Input */}
-                  <div className="mb-4">
-                    <label htmlFor="email" className="block text-xs md:text-sm text-gray-300 mb-2">Email (Optional)</label>
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-2 md:p-2.5 text-sm bg-[#1a1a1a] font-[300] border border-gray-700 text-white rounded-lg focus:outline-none focus:border-green-500 hover:border-gray-600 transition-colors"
-                      placeholder="Enter your email"
-                      disabled={isLoading}
-                    />
-                  </div>
-
                   {/* Password Input */}
                   <div className="mb-4">
                     <label htmlFor="password" className="block text-xs md:text-sm text-gray-300 mb-2">Password</label>

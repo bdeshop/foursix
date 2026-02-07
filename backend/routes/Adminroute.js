@@ -11896,4 +11896,576 @@ Adminrouter.put("/affilaite-payouts/:id/status", async (req, res) => {
     });
   }
 });
+
+
+// ==================== AFFILIATE KYC MANAGEMENT ROUTES ====================
+
+// GET affiliate KYC status
+Adminrouter.get("/affiliates/:id/kyc-status", async (req, res) => {
+  try {
+    const affiliate = await Affiliate.findById(req.params.id)
+      .select("kycverified kycStatus kycFrontImage kycBackImage verificationStatus verificationDocuments");
+
+    if (!affiliate) {
+      return res.status(404).json({ error: "Affiliate not found" });
+    }
+
+    res.json({
+      kycverified: affiliate.kycverified,
+      kycStatus: affiliate.kycStatus,
+      kycFrontImage: affiliate.kycFrontImage,
+      kycBackImage: affiliate.kycBackImage,
+      verificationStatus: affiliate.verificationStatus,
+      verificationDocuments: affiliate.verificationDocuments,
+      canWithdraw: affiliate.kycverified && affiliate.kycStatus === 'approved'
+    });
+  } catch (error) {
+    console.error("Error fetching affiliate KYC status:", error);
+    res.status(500).json({ error: "Failed to fetch affiliate KYC status" });
+  }
+});
+
+// PUT update affiliate KYC status (approve/reject)
+Adminrouter.put("/affiliates/:id/kyc-status", async (req, res) => {
+  try {
+    const { kycStatus, kycverified, notes, rejectionReason } = req.body;
+
+    // Validate kycStatus
+    if (kycStatus && !['pending', 'approved', 'rejected'].includes(kycStatus)) {
+      return res.status(400).json({ 
+        error: "Valid KYC status is required (pending, approved, rejected)" 
+      });
+    }
+
+    const affiliate = await Affiliate.findById(req.params.id);
+    if (!affiliate) {
+      return res.status(404).json({ error: "Affiliate not found" });
+    }
+
+    // Update KYC status
+    if (kycStatus !== undefined) {
+      affiliate.kycStatus = kycStatus;
+    }
+
+    // Update verification status
+    if (kycverified !== undefined) {
+      affiliate.kycverified = kycverified;
+    }
+
+    // If rejecting, store rejection reason
+    if (kycStatus === 'rejected' && rejectionReason) {
+      affiliate.verificationDocuments = affiliate.verificationDocuments || [];
+      affiliate.verificationDocuments.push({
+        documentType: 'kyc_rejection',
+        status: 'rejected',
+        notes: `Rejection: ${rejectionReason}`,
+        rejectionReason: rejectionReason,
+        processedAt: new Date()
+      });
+    }
+
+    // If approving, mark as verified
+    if (kycStatus === 'approved') {
+      affiliate.kycverified = true;
+      affiliate.verificationStatus = 'verified';
+      
+      // Add approval document
+      affiliate.verificationDocuments = affiliate.verificationDocuments || [];
+      affiliate.verificationDocuments.push({
+        documentType: 'kyc_approval',
+        status: 'approved',
+        notes: notes || 'KYC approved by admin',
+        approvedAt: new Date(),
+        approvedBy: req.user?._id
+      });
+    }
+
+    await affiliate.save();
+
+    // Log KYC status change
+    console.log(`Admin ${req.user?.username} updated KYC status for affiliate ${affiliate._id} to ${kycStatus}`);
+
+    res.json({
+      message: "KYC status updated successfully",
+      affiliate: {
+        id: affiliate._id,
+        fullName: affiliate.fullName,
+        kycverified: affiliate.kycverified,
+        kycStatus: affiliate.kycStatus,
+        verificationStatus: affiliate.verificationStatus
+      }
+    });
+  } catch (error) {
+    console.error("Error updating affiliate KYC status:", error);
+    res.status(500).json({ error: "Failed to update affiliate KYC status" });
+  }
+});
+
+// POST upload KYC documents (admin can upload for affiliate)
+Adminrouter.post("/affiliates/:id/kyc/upload", async (req, res) => {
+  try {
+    // Configure multer for KYC document uploads
+    const kycStorage = multer.diskStorage({
+      destination: function (req, file, cb) {
+        const uploadPath = "./public/uploads/affiliate-kyc/";
+        if (!fs.existsSync(uploadPath)) {
+          fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+      },
+      filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, `affiliate-kyc-${req.params.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+      },
+    });
+
+    const uploadKyc = multer({
+      storage: kycStorage,
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith("image/")) {
+          cb(null, true);
+        } else {
+          cb(new Error("Only image files are allowed!"), false);
+        }
+      }
+    });
+
+    // Handle the upload
+    uploadKyc.fields([
+      { name: 'frontImage', maxCount: 1 },
+      { name: 'backImage', maxCount: 1 }
+    ])(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+
+      const affiliate = await Affiliate.findById(req.params.id);
+      if (!affiliate) {
+        // Clean up uploaded files if affiliate not found
+        if (req.files?.frontImage) {
+          fs.unlinkSync(req.files.frontImage[0].path);
+        }
+        if (req.files?.backImage) {
+          fs.unlinkSync(req.files.backImage[0].path);
+        }
+        return res.status(404).json({ error: "Affiliate not found" });
+      }
+
+      // Update KYC images
+      if (req.files?.frontImage) {
+        // Delete old front image if exists
+        if (affiliate.kycFrontImage) {
+          const oldPath = path.join(__dirname, "..", affiliate.kycFrontImage);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        }
+        affiliate.kycFrontImage = `/uploads/affiliate-kyc/${req.files.frontImage[0].filename}`;
+      }
+
+      if (req.files?.backImage) {
+        // Delete old back image if exists
+        if (affiliate.kycBackImage) {
+          const oldPath = path.join(__dirname, "..", affiliate.kycBackImage);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        }
+        affiliate.kycBackImage = `/uploads/affiliate-kyc/${req.files.backImage[0].filename}`;
+      }
+
+      // Update KYC status
+      affiliate.kycStatus = 'pending';
+      affiliate.kycverified = false;
+
+      // Add to verification documents
+      affiliate.verificationDocuments = affiliate.verificationDocuments || [];
+      affiliate.verificationDocuments.push({
+        documentType: 'kyc_upload',
+        documentUrl: req.files?.frontImage ? affiliate.kycFrontImage : undefined,
+        uploadedAt: new Date(),
+        status: 'pending',
+        notes: 'KYC documents uploaded by admin'
+      });
+
+      await affiliate.save();
+
+      res.json({
+        message: "KYC documents uploaded successfully",
+        kycStatus: 'pending',
+        images: {
+          front: affiliate.kycFrontImage,
+          back: affiliate.kycBackImage
+        }
+      });
+    });
+  } catch (error) {
+    console.error("Error uploading KYC documents:", error);
+    res.status(500).json({ error: "Failed to upload KYC documents" });
+  }
+});
+
+// DELETE KYC documents
+Adminrouter.delete("/affiliates/:id/kyc/documents", async (req, res) => {
+  try {
+    const { imageType } = req.body; // 'front', 'back', or 'all'
+
+    if (!imageType || !['front', 'back', 'all'].includes(imageType)) {
+      return res.status(400).json({ 
+        error: "Valid imageType is required (front, back, all)" 
+      });
+    }
+
+    const affiliate = await Affiliate.findById(req.params.id);
+    if (!affiliate) {
+      return res.status(404).json({ error: "Affiliate not found" });
+    }
+
+    // Delete front image
+    if ((imageType === 'front' || imageType === 'all') && affiliate.kycFrontImage) {
+      const frontPath = path.join(__dirname, "..", affiliate.kycFrontImage);
+      if (fs.existsSync(frontPath)) {
+        fs.unlinkSync(frontPath);
+      }
+      affiliate.kycFrontImage = null;
+    }
+
+    // Delete back image
+    if ((imageType === 'back' || imageType === 'all') && affiliate.kycBackImage) {
+      const backPath = path.join(__dirname, "..", affiliate.kycBackImage);
+      if (fs.existsSync(backPath)) {
+        fs.unlinkSync(backPath);
+      }
+      affiliate.kycBackImage = null;
+    }
+
+    // Reset KYC status if all images are deleted
+    if (imageType === 'all') {
+      affiliate.kycStatus = 'pending';
+      affiliate.kycverified = false;
+    }
+
+    await affiliate.save();
+
+    res.json({
+      message: `KYC ${imageType === 'all' ? 'documents' : imageType + ' image'} deleted successfully`,
+      kycStatus: affiliate.kycStatus
+    });
+  } catch (error) {
+    console.error("Error deleting KYC documents:", error);
+    res.status(500).json({ error: "Failed to delete KYC documents" });
+  }
+});
+
+// GET all affiliates requiring KYC verification
+Adminrouter.get("/affiliates/kyc/pending", async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc' 
+    } = req.query;
+
+    let filter = {
+      $or: [
+        { kycStatus: 'pending' },
+        { kycverified: false },
+        { kycStatus: { $exists: false } }
+      ]
+    };
+
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: "i" } },
+        { lastName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { affiliateCode: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const affiliates = await Affiliate.find(filter)
+      .select("firstName lastName email affiliateCode kycverified kycStatus kycFrontImage kycBackImage createdAt")
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Affiliate.countDocuments(filter);
+
+    // Get statistics
+    const stats = await Affiliate.aggregate([
+      {
+        $group: {
+          _id: "$kycStatus",
+          count: { $sum: 1 },
+          hasImages: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $ne: ["$kycFrontImage", null] },
+                  { $ne: ["$kycBackImage", null] }
+                ]},
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    res.json({
+      affiliates,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      total,
+      stats
+    });
+  } catch (error) {
+    console.error("Error fetching pending KYC affiliates:", error);
+    res.status(500).json({ error: "Failed to fetch pending KYC affiliates" });
+  }
+});
+
+// GET KYC verification statistics
+Adminrouter.get("/affiliates/kyc/stats", async (req, res) => {
+  try {
+    const stats = await Affiliate.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalAffiliates: { $sum: 1 },
+          kycVerified: {
+            $sum: { $cond: [{ $and: ["$kycverified", { $eq: ["$kycStatus", "approved"] }] }, 1, 0] }
+          },
+          kycPending: {
+            $sum: { $cond: [{ $or: [
+              { $eq: ["$kycStatus", "pending"] },
+              { $eq: ["$kycStatus", null] },
+              { $eq: ["$kycverified", false] }
+            ]}, 1, 0] }
+          },
+          kycRejected: {
+            $sum: { $cond: [{ $eq: ["$kycStatus", "rejected"] }, 1, 0] }
+          },
+          withFrontImage: {
+            $sum: { $cond: [{ $ne: ["$kycFrontImage", null] }, 1, 0] }
+          },
+          withBackImage: {
+            $sum: { $cond: [{ $ne: ["$kycBackImage", null] }, 1, 0] }
+          },
+          withBothImages: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $ne: ["$kycFrontImage", null] },
+                  { $ne: ["$kycBackImage", null] }
+                ]},
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    const result = stats[0] || {
+      totalAffiliates: 0,
+      kycVerified: 0,
+      kycPending: 0,
+      kycRejected: 0,
+      withFrontImage: 0,
+      withBackImage: 0,
+      withBothImages: 0
+    };
+
+    // Calculate percentages
+    result.kycVerifiedPercentage = result.totalAffiliates > 0 
+      ? (result.kycVerified / result.totalAffiliates) * 100 
+      : 0;
+    
+    result.completeKycPercentage = result.totalAffiliates > 0
+      ? (result.withBothImages / result.totalAffiliates) * 100
+      : 0;
+
+    res.json({
+      success: true,
+      stats: result
+    });
+  } catch (error) {
+    console.error("Error fetching KYC stats:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch KYC statistics" 
+    });
+  }
+});
+
+// POST bulk KYC approval/rejection
+Adminrouter.post("/affiliates/kyc/bulk-update", async (req, res) => {
+  try {
+    const { affiliateIds, action, rejectionReason, notes } = req.body;
+
+    if (!affiliateIds || !Array.isArray(affiliateIds) || affiliateIds.length === 0) {
+      return res.status(400).json({ error: "Valid array of affiliate IDs is required" });
+    }
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: "Valid action is required (approve, reject)" });
+    }
+
+    if (action === 'reject' && !rejectionReason) {
+      return res.status(400).json({ error: "Rejection reason is required for reject action" });
+    }
+
+    const results = {
+      total: affiliateIds.length,
+      processed: 0,
+      approved: 0,
+      rejected: 0,
+      failed: []
+    };
+
+    // Process each affiliate
+    for (const affiliateId of affiliateIds) {
+      try {
+        const affiliate = await Affiliate.findById(affiliateId);
+        
+        if (!affiliate) {
+          results.failed.push({
+            affiliateId,
+            error: "Affiliate not found"
+          });
+          continue;
+        }
+
+        if (action === 'approve') {
+          affiliate.kycStatus = 'approved';
+          affiliate.kycverified = true;
+          affiliate.verificationStatus = 'verified';
+          
+          // Add approval record
+          affiliate.verificationDocuments = affiliate.verificationDocuments || [];
+          affiliate.verificationDocuments.push({
+            documentType: 'kyc_bulk_approval',
+            status: 'approved',
+            notes: notes || 'KYC approved in bulk by admin',
+            approvedAt: new Date(),
+            approvedBy: req.user?._id
+          });
+          
+          results.approved++;
+        } else {
+          affiliate.kycStatus = 'rejected';
+          affiliate.kycverified = false;
+          
+          // Add rejection record
+          affiliate.verificationDocuments = affiliate.verificationDocuments || [];
+          affiliate.verificationDocuments.push({
+            documentType: 'kyc_bulk_rejection',
+            status: 'rejected',
+            notes: `Rejection: ${rejectionReason}`,
+            rejectionReason: rejectionReason,
+            processedAt: new Date()
+          });
+          
+          results.rejected++;
+        }
+
+        await affiliate.save();
+        results.processed++;
+      } catch (error) {
+        console.error(`Error processing affiliate ${affiliateId}:`, error);
+        results.failed.push({
+          affiliateId,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Bulk KYC update completed. Processed ${results.processed} affiliates.`,
+      results
+    });
+  } catch (error) {
+    console.error("Error in bulk KYC update:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to process bulk KYC update" 
+    });
+  }
+});
+
+// GET affiliate KYC verification timeline
+Adminrouter.get("/affiliates/:id/kyc/timeline", async (req, res) => {
+  try {
+    const affiliate = await Affiliate.findById(req.params.id)
+      .select("verificationDocuments createdAt kycStatus kycverified");
+
+    if (!affiliate) {
+      return res.status(404).json({ error: "Affiliate not found" });
+    }
+
+    const timeline = [];
+    
+    // Add registration date
+    timeline.push({
+      date: affiliate.createdAt,
+      action: 'registered',
+      status: 'completed',
+      description: 'Affiliate account created'
+    });
+
+    // Add KYC status changes from verification documents
+    if (affiliate.verificationDocuments && affiliate.verificationDocuments.length > 0) {
+      affiliate.verificationDocuments.forEach(doc => {
+        timeline.push({
+          date: doc.uploadedAt || doc.processedAt || doc.approvedAt,
+          action: doc.documentType,
+          status: doc.status,
+          description: doc.notes || `Document ${doc.status}`,
+          documentUrl: doc.documentUrl,
+          processedBy: doc.processedBy,
+          rejectionReason: doc.rejectionReason
+        });
+      });
+    }
+
+    // Add current KYC status
+    timeline.push({
+      date: new Date(),
+      action: 'current_status',
+      status: affiliate.kycStatus,
+      description: `Current KYC status: ${affiliate.kycStatus}`,
+      kycverified: affiliate.kycverified
+    });
+
+    // Sort by date (newest first)
+    timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({
+      success: true,
+      timeline,
+      currentStatus: {
+        kycStatus: affiliate.kycStatus,
+        kycverified: affiliate.kycverified,
+        lastUpdate: timeline[0]?.date
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching KYC timeline:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch KYC timeline" 
+    });
+  }
+});
 module.exports = Adminrouter;

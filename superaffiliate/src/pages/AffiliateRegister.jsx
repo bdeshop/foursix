@@ -63,7 +63,7 @@ const AffiliateRegister = () => {
       // Sending only the necessary profile data
       const res = await axios.post(`${base_url}/api/auth/affiliate/register`, formData);
       if (res.data.success) {
-        toast.success('Registration successful! Awaiting approval.');
+        toast.success('Registration successful!');
         setTimeout(() => navigate("/login"), 2000);
       }
     } catch (err) {

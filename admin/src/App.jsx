@@ -60,6 +60,7 @@ import Affiliatedetails from './pages/allaffiliates/Affiliatedetails'
 import Managecommission from './pages/managecommission/Managecommission'
 import Editbonus from './pages/bonus/Editbonus'
 import Viewbonus from './pages/bonus/Viewbonus'
+import KYCManagement from './pages/kycmanagement/KYCManagement'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -587,6 +588,16 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+             <Route 
+          exact 
+          path="/affiliates/kyc-managemnet" 
+          element={
+            <ProtectedRoute>
+              <KYCManagement />
+            </ProtectedRoute>
+          }
+        />
+
                    <Route 
           exact 
           path="/affiliates/affilaite-details/:id" 

@@ -36,6 +36,7 @@ import { MdSportsSoccer } from "react-icons/md";
 import axios from "axios";
 import logo from "../../assets/logo.png";
 import slot_img from "../../assets/slots.png";
+import exclusive_img from "../../assets/exclusive.png";
 import casino_img from "../../assets/casino.png";
 import banner from "../../assets/banner.jpg";
 import play_img from "../../assets/play.png";
@@ -1294,6 +1295,22 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
             <img src={menu_img} alt="Menu" className="h-6 w-6 mb-1" />
             <span>Menu</span>
           </button>
+             <NavLink
+            to="/"
+            className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <img src={exclusive_img} alt="Slots" className="h-6 w-6 mb-1" />
+            <span>Home</span>
+          </NavLink>
+             <NavLink
+            to="/slots"
+            className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <img src={slot_img} alt="Slots" className="h-6 w-6 mb-1" />
+            <span>Slots</span>
+          </NavLink>
           <NavLink
             to="/casino"
             className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
@@ -1302,23 +1319,6 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
             <img src={casino_img} alt="Casino" className="h-6 w-6 mb-1" />
             <span>Casino</span>
           </NavLink>
-          <NavLink
-            to="/slots"
-            className="flex flex-col items-center justify-center p-2 text-xs text-gray-400 hover:text-yellow-400 transition-colors"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <img src={slot_img} alt="Slots" className="h-6 w-6 mb-1" />
-            <span>Slots</span>
-          </NavLink>
-
-          {/* Download App Button in Mobile Bottom Bar */}
-          <button
-            onClick={() => downloadFileAtURL(APK_FILE)}
-            className="flex flex-col items-center justify-center p-2 text-xs text-theme_color hover:text-yellow-400 transition-colors"
-          >
-            <FaMobileAlt className="h-6 w-6 mb-1" />
-            <span>App</span>
-          </button>
 
           {isLoggedIn ? (
             <NavLink

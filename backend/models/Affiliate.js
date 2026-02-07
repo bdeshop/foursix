@@ -49,6 +49,23 @@ const affiliateSchema = new mongoose.Schema({
   createdBy:{
     type: String,
   },
+kycverified: {
+  type: Boolean,
+  default: false
+},
+kycStatus: {
+  type: String,
+  enum: ['pending', 'approved', 'rejected'],
+  default: 'pending'
+},
+kycFrontImage: {
+  type: String,  // Front ID image URL
+  default: null
+},
+kycBackImage: {
+  type: String,  // Back ID image URL
+  default: null
+},
   // Business Information
   company: {
     type: String,
@@ -87,7 +104,7 @@ const affiliateSchema = new mongoose.Schema({
   // Commission & Earnings
   commissionRate: {
     type: Number,
-    default: 0, // 10% default for bet
+    default:40, // 10% default for bet
   },
   depositRate: {
     type: Number,
@@ -252,12 +269,12 @@ const affiliateSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['pending', 'active', 'suspended', 'banned','inactive'],
-    default: 'pending'
+    default: 'active'
   },
   verificationStatus: {
     type: String,
     enum: ['unverified', 'pending', 'verified', 'rejected'],
-    default: 'unverified'
+    default: 'verified'
   },
   verificationDocuments: [{
     documentType: String,
@@ -416,19 +433,19 @@ affiliateSchema.virtual('isLocked').get(function() {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
-affiliateSchema.virtual('earningsThisMonth').get(function() {
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
+// affiliateSchema.virtual('earningsThisMonth').get(function() {
+//   const startOfMonth = new Date();
+//   startOfMonth.setDate(1);
+//   startOfMonth.setHours(0, 0, 0, 0);
   
-  return this.earningsHistory
-    .filter(earning => earning.earnedAt >= startOfMonth && earning.status !== 'cancelled')
-    .reduce((total, earning) => total + earning.amount, 0);
-});
+//   return this.earningsHistory
+//     .filter(earning => earning.earnedAt >= startOfMonth && earning.status !== 'cancelled')
+//     .reduce((total, earning) => total + earning.amount, 0);
+// });
 
-affiliateSchema.virtual('pendingEarningsCount').get(function() {
-  return this.earningsHistory.filter(earning => earning.status === 'pending').length;
-});
+// affiliateSchema.virtual('pendingEarningsCount').get(function() {
+//   return this.earningsHistory.filter(earning => earning.status === 'pending').length;
+// });
 
 affiliateSchema.virtual('formattedPaymentDetails').get(function() {
   const method = this.paymentMethod;
@@ -894,15 +911,14 @@ affiliateSchema.statics.getStats = async function() {
 };
 
 // JSON transform to remove sensitive information
-affiliateSchema.methods.toJSON = function() {
-  const affiliate = this.toObject();
-  delete affiliate.password;
-  delete affiliate.resetPasswordToken;
-  delete affiliate.resetPasswordExpires;
-  delete affiliate.emailVerificationToken;
-  delete affiliate.loginAttempts;
-  delete affiliate.lockUntil;
-  return affiliate;
-};
+// affiliateSchema.methods.toJSON = function() {
+//   delete affiliate.password;
+//   delete affiliate.resetPasswordToken;
+//   delete affiliate.resetPasswordExpires;
+//   delete affiliate.emailVerificationToken;
+//   delete affiliate.loginAttempts;
+//   delete affiliate.lockUntil;
+//   return affiliate;
+// };
 
 module.exports = mongoose.model('Affiliate', affiliateSchema);
