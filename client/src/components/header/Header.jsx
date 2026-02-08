@@ -45,7 +45,7 @@ import menu_img from "../../assets/icon-menu.png";
 import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../../App";
 
-const APK_FILE = "https://http://localhost:4500.live/onexwin.apk";
+const APK_FILE = "https://foursix.live/onexwin.apk";
 
 export const Header = ({ sidebarOpen, setSidebarOpen }) => {
   const API_BASE_URL = import.meta.env.VITE_API_KEY_Base_URL;
@@ -613,7 +613,7 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
       title: "Affiliate",
       icon: <FaHandshake className="w-5 h-5 min-w-[20px]" />,
       subItems: [],
-            onClick: () =>{window.location.href="https://m-affiliate.foursix.live"},
+            onClick: () =>{window.location.href="https://affiliate.foursix.live"},
     },
     {
       title: "Brand Ambassadors",
