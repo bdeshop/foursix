@@ -454,36 +454,7 @@ const Dashboard = () => {
           </div>
 
           {/* Performance Metrics & Payout Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
-            {/* Performance Metrics */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest">Performance Metrics</h2>
-                <FaChartBar className="text-cyan-400 text-xl" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 border border-white/10 rounded-lg hover:border-cyan-500/30 transition-colors">
-                  <div className="text-2xl md:text-3xl font-bold text-cyan-400 mb-2">{formatNumber(dashboardStats.clicks)}</div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Total Clicks</p>
-                </div>
-                
-                <div className="text-center p-4 border border-white/10 rounded-lg hover:border-cyan-500/30 transition-colors">
-                  <div className="text-2xl md:text-3xl font-bold text-cyan-400 mb-2">{formatNumber(dashboardStats.registrations)}</div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Registrations</p>
-                </div>
-                
-                <div className="text-center p-4 border border-white/10 rounded-lg hover:border-cyan-500/30 transition-colors">
-                  <div className="text-2xl md:text-3xl font-bold text-cyan-400 mb-2">{formatNumber(dashboardStats.depositCount)}</div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Deposits</p>
-                </div>
-                
-                <div className="text-center p-4 border border-white/10 rounded-lg hover:border-cyan-500/30 transition-colors">
-                  <div className="text-2xl md:text-3xl font-bold text-cyan-400 mb-2">{formatCurrency(dashboardStats.totalDeposits)}</div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Deposit Value</p>
-                </div>
-              </div>
-            </div>
+          <div className="grid grid-cols-1  gap-6 md:gap-8 mb-6 md:mb-8">
 
             {/* Payout Section */}
             <div className="bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 rounded-xl p-5 md:p-6 backdrop-blur-sm">
