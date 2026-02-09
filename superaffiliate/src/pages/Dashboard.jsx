@@ -12,7 +12,8 @@ import {
   FaPercent,
   FaCalendarAlt,
   FaExchangeAlt,
-  FaDollarSign
+  FaDollarSign,
+  FaCopy
 } from 'react-icons/fa';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -24,6 +25,8 @@ import { FaBangladeshiTakaSign } from "react-icons/fa6";
 const Dashboard = () => {
   const base_url = import.meta.env.VITE_API_KEY_Base_URL;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [referralUrl, setReferralUrl] = useState('');
+  const [copied, setCopied] = useState(false);
   
   // Profile states
   const [profile, setProfile] = useState({
@@ -89,6 +92,12 @@ const Dashboard = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  // Generate referral URL
+  const generateReferralUrl = (affiliateCode) => {
+    const websiteUrl = 'https://foursix.live'; // Your website URL
+    return `${websiteUrl}/register?aff=${affiliateCode}`;
+  };
+
   // Load affiliate data from localStorage and dashboard stats
   useEffect(() => {
     const affiliateData = localStorage.getItem('affiliate');
@@ -101,6 +110,12 @@ const Dashboard = () => {
           totalPayout: parsedData.totalPayout || 0,
           pendingPayout: parsedData.pendingPayout || 0
         });
+        
+        // Generate referral URL
+        if (parsedData.affiliateCode) {
+          const url = generateReferralUrl(parsedData.affiliateCode);
+          setReferralUrl(url);
+        }
       } catch (error) {
         console.error('Error parsing affiliate data:', error);
       }
@@ -172,6 +187,16 @@ const Dashboard = () => {
     }
   };
 
+  const copyToClipboard = () => {
+    if (referralUrl) {
+      navigator.clipboard.writeText(referralUrl).then(() => {
+        setCopied(true);
+        toast.success('Referral link copied to clipboard!');
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-BD', {
       style: 'currency',
@@ -237,6 +262,47 @@ const Dashboard = () => {
             isSidebarOpen ? 'md:ml-[40%] lg:ml-[28%] xl:ml-[17%]' : 'ml-0'
           }`}
         >
+          {/* Referral URL Section - Top */}
+          <div className="mb-6 md:mb-8">
+            <div className="bg-gradient-to-r from-cyan-500/10 to-blue-600/10 border border-cyan-500/30 rounded-xl p-4 md:p-6 backdrop-blur-sm">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex-1">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Your Referral Link</h2>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={referralUrl}
+                      readOnly
+                      className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-gray-300 text-sm font-mono truncate"
+                      placeholder="Generating referral link..."
+                    />
+                    <button
+                      onClick={copyToClipboard}
+                      disabled={!referralUrl}
+                      className={`p-2 rounded-md transition-all duration-300 ${
+                        copied 
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white' 
+                          : referralUrl
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-black hover:brightness-110 cursor-pointer'
+                            : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <FaCopy className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Share this link to refer new users and earn commissions
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-gradient-to-r from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 rounded-md text-xs font-bold uppercase tracking-widest">
+                    Affiliate Code: {profile.affiliateCode || 'N/A'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Welcome Header */}
           <div className="mb-6 md:mb-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -371,6 +437,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+
             {/* Monthly Earnings Card */}
             <div className="bg-gradient-to-br from-emerald-500/10 to-teal-600/10 border border-emerald-500/20 rounded-xl p-5 md:p-6 backdrop-blur-sm">
               <div className="flex items-center gap-4">
@@ -387,15 +454,15 @@ const Dashboard = () => {
           </div>
 
           {/* Performance Metrics & Payout Section */}
-          <div className="grid grid-cols-1  gap-6 md:gap-8 mb-6 md:mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
             {/* Performance Metrics */}
-            {/* <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-xl p-5 md:p-6 backdrop-blur-sm">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest">Performance Metrics</h2>
                 <FaChartBar className="text-cyan-400 text-xl" />
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 border border-white/10 rounded-lg hover:border-cyan-500/30 transition-colors">
                   <div className="text-2xl md:text-3xl font-bold text-cyan-400 mb-2">{formatNumber(dashboardStats.clicks)}</div>
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Total Clicks</p>
@@ -416,10 +483,10 @@ const Dashboard = () => {
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Deposit Value</p>
                 </div>
               </div>
-            </div> */}
+            </div>
 
             {/* Payout Section */}
-            {/* <div className="bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 rounded-xl p-5 md:p-6 backdrop-blur-sm">
+            <div className="bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 rounded-xl p-5 md:p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest">Payout</h2>
                 <FaShield className="text-cyan-400 text-xl" />
@@ -458,7 +525,7 @@ const Dashboard = () => {
                   </p>
                 </div>
               </div>
-            </div> */}
+            </div>
           </div>
         </main>
       </div>
