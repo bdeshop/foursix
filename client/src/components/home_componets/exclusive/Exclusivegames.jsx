@@ -18,7 +18,7 @@ const Exclusivegames = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [dynamicLogo, setDynamicLogo] = useState(logo);
 
-  // Games per row based on screen size - MOBILE: 3 games per row
+  // Games per row based on screen size
   const getGamesPerRow = () => {
     if (window.innerWidth >= 1280) return 7; // xl: 7 columns
     if (window.innerWidth >= 1024) return 6; // lg: 6 columns
@@ -55,20 +55,86 @@ const Exclusivegames = () => {
     }
   };
 
+  // Get game image URL with proper path handling
+  const getGameImageUrl = (game) => {
+    if (!game) return '';
+    
+    // Try different possible image fields
+    const imagePath = game.portraitImage || game.image || game.thumbnail || game.gameImage || '';
+    
+    if (!imagePath) {
+      // Return a placeholder if no image
+      return 'https://via.placeholder.com/300x400/2A3254/ffffff?text=Game';
+    }
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Remove leading slash if present to avoid double slash
+    const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    
+    // Construct the full URL
+    return `${base_url}/${cleanPath}`;
+  };
+
   // Fetch exclusive games
   const fetchExclusiveGames = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${base_url}/api/exclusive-games`);
       
-      if (response.data && response.data.length > 0) {
-        setExclusiveGames(response.data);
+      // Try multiple possible endpoints
+      let response;
+      try {
+        // First try the exclusive-games endpoint
+        response = await axios.get(`${base_url}/api/exclusive-games`);
+      } catch (error) {
+        if (error.response && error.response.status === 404) {
+          // If exclusive-games endpoint doesn't exist, try menu-games with filter
+          response = await axios.get(`${base_url}/api/menu-games`);
+        } else {
+          throw error;
+        }
+      }
+      
+      let gamesData = [];
+      
+      // Handle different response structures
+      if (response.data && response.data.success && response.data.data) {
+        gamesData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        gamesData = response.data;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        gamesData = response.data.data;
+      }
+      
+      // Filter for exclusive games if we got from menu-games
+      if (gamesData.length > 0) {
+        const exclusiveFiltered = gamesData.filter(game => {
+          if (!game) return false;
+          
+          const categoryName = (game.categoryname || game.category || game.categoryName || '').toLowerCase();
+          const gameName = (game.name || game.gameName || '').toLowerCase();
+          
+          return categoryName.includes("exclusive") || 
+                 categoryName.includes("exlusive") ||
+                 gameName.includes("exclusive") ||
+                 gameName.includes("exlusive");
+        });
         
-        // Calculate initial games to show (2 rows worth) - MOBILE: 2 rows × 3 games = 6 games
+        // If we found exclusive games, use them, otherwise use all games
+        gamesData = exclusiveFiltered.length > 0 ? exclusiveFiltered : gamesData;
+      }
+      
+      if (gamesData.length > 0) {
+        setExclusiveGames(gamesData);
+        
+        // Calculate initial games to show (2 rows worth)
         const initialCount = gamesPerRow * 2;
-        const initialGames = response.data.slice(0, initialCount);
+        const initialGames = gamesData.slice(0, initialCount);
         setDisplayedGames(initialGames);
-        setHasMoreGames(response.data.length > initialCount);
+        setHasMoreGames(gamesData.length > initialCount);
         setGamesPage(1);
       } else {
         setExclusiveGames([]);
@@ -79,7 +145,7 @@ const Exclusivegames = () => {
       console.error("Error fetching exclusive games:", error);
       
       if (error.response && error.response.status === 404) {
-        toast.error("Exclusive category not found");
+        toast.error("Exclusive games endpoint not found");
       } else {
         toast.error("Failed to load exclusive games");
       }
@@ -98,7 +164,7 @@ const Exclusivegames = () => {
   // Update displayed games when games per row changes
   useEffect(() => {
     if (exclusiveGames.length > 0) {
-      const initialCount = gamesPerRow * 2; // Always show 2 rows
+      const initialCount = gamesPerRow * 2;
       const initialGames = exclusiveGames.slice(0, initialCount);
       setDisplayedGames(initialGames);
       setHasMoreGames(exclusiveGames.length > initialCount);
@@ -106,8 +172,10 @@ const Exclusivegames = () => {
     }
   }, [gamesPerRow, exclusiveGames]);
 
-  // Handle game click
+  // Handle game click with proper navigation
   const handleGameClick = (game) => {
+    console.log("Game clicked:", game); // For debugging
+    
     const token = localStorage.getItem("token");
     
     if (!token) {
@@ -115,32 +183,40 @@ const Exclusivegames = () => {
       return;
     }
     
-    const gameId = game.gameApiID || game._id;
-    navigate(`/game/${gameId}`);
+    // Get the game ID from various possible fields
+    const gameId = game.gameApiID || game.gameId || game._id;
+    
+    if (!gameId) {
+      toast.error("Game ID not found");
+      return;
+    }
+    
+    // Navigate to game page with provider and category if available
+    const provider = game.provider || game.providercode || '';
+    const category = game.categoryname || game.category || '';
+    
+    let navigateUrl = `/game/${gameId}`;
+    
+    // Add query parameters if available
+    const params = new URLSearchParams();
+    if (provider) params.append('provider', provider);
+    if (category) params.append('category', category);
+    
+    if (params.toString()) {
+      navigateUrl += `?${params.toString()}`;
+    }
+    
+    navigate(navigateUrl);
   };
 
-  // Handle opening the game
-  const handleOpenGame = async (game) => {
-    console.log("Attempting to open game:", game);
-
-    const token = localStorage.getItem("token");
-    
-    if (!token) {
-      toast.error("Please login to play games");
-      setShowLoginPopup(true);
-      return;
-    }
-
-    try {
-      setGameLoading(true);
-      const gameId = game.gameApiID || game._id;
-      navigate(`/game/${gameId}`);
-    } catch (err) {
-      console.error("Error:", err);
-      toast.error("Error connecting to game server");
-    } finally {
-      setGameLoading(false);
-    }
+  // Handle show more games
+  const handleShowMore = () => {
+    const nextPage = gamesPage + 1;
+    const gamesPerLoad = gamesPerRow * 2;
+    const nextGames = exclusiveGames.slice(0, gamesPerLoad * nextPage);
+    setDisplayedGames(nextGames);
+    setGamesPage(nextPage);
+    setHasMoreGames(exclusiveGames.length > nextGames.length);
   };
 
   // Handle login from popup
@@ -153,16 +229,6 @@ const Exclusivegames = () => {
   const handleRegisterFromPopup = () => {
     setShowLoginPopup(false);
     navigate("/register");
-  };
-
-  // Handle show more games - Loads 2 more rows each time
-  const handleShowMore = () => {
-    const nextPage = gamesPage + 1;
-    const gamesPerLoad = gamesPerRow * 2; // Load 2 more rows each time
-    const nextGames = exclusiveGames.slice(0, gamesPerLoad * nextPage);
-    setDisplayedGames(nextGames);
-    setGamesPage(nextPage);
-    setHasMoreGames(exclusiveGames.length > nextGames.length);
   };
 
   // Close popup when clicking outside
@@ -179,27 +245,29 @@ const Exclusivegames = () => {
     };
   }, [showLoginPopup]);
 
-  // Calculate how many games to show initially - Always 2 rows
+  // Calculate skeleton count
   const calculateInitialGames = () => {
-    return gamesPerRow * 2; // 2 rows
+    return gamesPerRow * 2;
   };
 
-  // Skeleton Loading Component - Shows 2 rows
+  // Skeleton Loading Component
   const ContentSkeleton = () => {
-    const skeletonCount = calculateInitialGames(); // 2 rows worth
+    const skeletonCount = calculateInitialGames();
     
     return (
-      <div className="px-2 md:p-4 pt-[40px]">
+      <div className="px-2 md:p-4">
         <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
           {Array.from({ length: skeletonCount }).map((_, index) => (
             <div
               key={index}
-              className="flex flex-col items-center bg-[#2A3254] rounded-[8px] border-[1px] border-gray-700 p-[10px]"
+              className="flex flex-col items-center rounded-[8px] overflow-hidden"
             >
-              <div className="w-full pb-[133.33%] relative bg-gray-700 rounded animate-pulse"></div>
-              <div className="pt-2 w-full">
-                <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
+              <div className="w-full pb-[133.33%] relative bg-[#2A3254] rounded-[8px] animate-pulse">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 border-4 border-theme_color border-t-transparent rounded-full animate-spin"></div>
+                </div>
               </div>
+              <div className="mt-2 w-full h-4 bg-[#2A3254] rounded animate-pulse"></div>
             </div>
           ))}
         </div>
@@ -217,6 +285,7 @@ const Exclusivegames = () => {
             height: 0;
             padding-bottom: 133.33%;
             overflow: hidden;
+            border-radius: 8px;
           }
           
           .game-image {
@@ -226,6 +295,11 @@ const Exclusivegames = () => {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: transform 0.3s ease;
+          }
+
+          .game-image:hover {
+            transform: scale(1.1);
           }
 
           @keyframes pulse {
@@ -241,6 +315,19 @@ const Exclusivegames = () => {
             animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
           }
 
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          .animate-spin {
+            animation: spin 1s linear infinite;
+          }
+
           .hidescrollbar {
             -ms-overflow-style: none;
             scrollbar-width: none;
@@ -251,73 +338,57 @@ const Exclusivegames = () => {
         `}
       </style>
 
-      {/* Header Title */}
+      {/* Header Section */}
       <div className=" pt-8">
-            <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
-            <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
-        Exclusive Games
-          </h2>
-        {/* Show how many games are visible */}
-        {!loading && displayedGames.length > 0 && (
-          <p className="text-gray-500 text-xs mt-2">
-            Showing {displayedGames.length} of {exclusiveGames.length} games
-          </p>
-        )}
+        <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
+          <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
+          Exclusive Games
+        </h2>
       </div>
 
-      {/* Show skeleton loading while fetching games - Shows 2 rows */}
+      {/* Show skeleton loading while fetching games */}
       {loading ? (
         <ContentSkeleton />
       ) : (
         <>
-          {/* Exclusive Games Grid - Shows exactly 2 rows initially */}
-          <div className="px-2 md:p-4">
+          {/* Exclusive Games Grid */}
+          <div className="py-[20px]">
             {displayedGames.length === 0 ? (
               <div className="text-center py-10">
                 <p className="text-gray-400 text-lg">No exclusive games available at the moment.</p>
               </div>
             ) : (
               <>
-                {/* Grid layout - Mobile: 3 columns (2 rows = 6 games) */}
-                <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+                {/* Grid layout */}
+                <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2 md:gap-3">
                   {displayedGames.map((game) => (
                     <div
-                      key={game._id}
-                      className="flex flex-col items-center rounded-[8px] overflow-hidden transition-all cursor-pointer relative group hover:border-theme_color hover:shadow-lg hover:shadow-theme_color/20"
+                      key={game._id || game.gameId || game.gameApiID}
+                      className="flex flex-col items-center rounded-[8px] overflow-hidden transition-all cursor-pointer group"
                       onClick={() => handleGameClick(game)}
                     >
-                      <div className="game-image-container">
+                      {/* Game Image Container */}
+                      <div className="game-image-container w-full border-2 border-transparent group-hover:border-theme_color group-hover:shadow-lg group-hover:shadow-theme_color/20 transition-all duration-300">
                         <img
-                          src={`${base_url}/${game.portraitImage || game.image || ''}`}
-                          alt={game.name}
-                          className="game-image transition-transform duration-300 group-hover:scale-110"
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/100x133/2A3254/ffffff?text=Game';
-                          }}
+                          src={getGameImageUrl(game)}
+                          alt={game.name || game.gameName || 'Game'}
+                          className="game-image"
+                          loading="lazy"
                         />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Load More Button - Only shows if there are more games */}
+                {/* Load More Button */}
                 {hasMoreGames && (
-                  <div className="flex justify-center mt-6">
+                  <div className="flex justify-center mt-8 mb-4">
                     <button
-                      className="px-8 py-3 bg-theme_color hover:bg-theme_color/90 text-white text-sm font-medium rounded-[5px] transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+                      className="px-8 py-3 bg-theme_color hover:bg-theme_color/90 text-white text-sm font-medium transition-all duration-300 hover:shadow-lg hover:shadow-theme_color/30 rounded-[5px]"
                       onClick={handleShowMore}
                     >
-                      Load More
+                      Load More Games
                     </button>
-                  </div>
-                )}
-
-                {/* Show message when all games are loaded */}
-                {!hasMoreGames && displayedGames.length > 0 && (
-                  <div className="text-center mt-4">
-                    <p className="text-gray-500 text-sm">
-                      All {exclusiveGames.length} exclusive games loaded
-                    </p>
                   </div>
                 )}
               </>
@@ -328,8 +399,8 @@ const Exclusivegames = () => {
 
       {/* Login Popup */}
       {showLoginPopup && (
-        <div className="fixed inset-0 bg-[rgba(0,0,0,0.4)] bg-opacity-70 backdrop-blur-md flex items-center justify-center z-[10000] p-4">
-          <div className="popup-content bg-gradient-to-b cursor-pointer from-[#1a1a1a] to-[#0f0f0f] border border-[#333] rounded-lg p-6 max-w-md w-full relative">
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-md flex items-center justify-center z-[10000] p-4">
+          <div className="popup-content bg-gradient-to-b from-[#1a1a1a] to-[#0f0f0f] border border-[#333] rounded-lg p-6 max-w-md w-full relative">
             <button
               onClick={() => setShowLoginPopup(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
@@ -362,8 +433,7 @@ const Exclusivegames = () => {
             </div>
 
             <p className="text-gray-300 text-xs md:text-[15px] text-center mb-6">
-              Please log in to play exclusive games. If you don't have an account, sign
-              up for free!
+              Please log in to play exclusive games. If you don't have an account, sign up for free!
             </p>
 
             <div className="flex flex-col gap-3">
@@ -387,7 +457,7 @@ const Exclusivegames = () => {
 
       {/* Game Loading Overlay */}
       {gameLoading && (
-        <div className="fixed inset-0 bg-[rgba(0,0,0,0.7)] flex items-center justify-center z-[1000]">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[1000]">
           <div className="flex flex-col items-center">
             <div className="relative mb-8">
               <img
