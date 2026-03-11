@@ -3,7 +3,8 @@ import {
   FaKey, FaCopy, FaCheck, FaSync, FaDownload, 
   FaToggleOn, FaToggleOff, FaCheckCircle, 
   FaTimesCircle, FaCalendarAlt, FaGlobe, 
-  FaUsers, FaMobileAlt, FaHistory, FaPlug
+  FaUsers, FaMobileAlt, FaHistory, FaPlug,
+  FaSave, FaEdit, FaTrash, FaUndo
 } from 'react-icons/fa';
 import { FiChevronRight } from 'react-icons/fi';
 import { MdTimer, MdDomain } from 'react-icons/md';
@@ -22,8 +23,14 @@ const Opayapi = () => {
   const [validationHistory, setValidationHistory] = useState([]);
   const [running, setRunning] = useState(false);
   const [runningUpdating, setRunningUpdating] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  
+  // API Key states
+  const [currentApiKey, setCurrentApiKey] = useState(''); // Currently displayed/saved key
+  const [newApiKey, setNewApiKey] = useState(''); // New key being entered for update
+  const [originalApiKey, setOriginalApiKey] = useState(''); // Last successfully validated key
+  const [isUpdating, setIsUpdating] = useState(false); // Whether in update mode
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
   
   const [subscriptionData, setSubscriptionData] = useState({
     days: 0,
@@ -61,12 +68,20 @@ const Opayapi = () => {
       if (response.data) {
         const { apiKey, validation, running, updatedAt } = response.data;
         
-        if (apiKey) setApiKey(apiKey);
+        if (apiKey) {
+          setCurrentApiKey(apiKey);
+          setOriginalApiKey(apiKey);
+          setNewApiKey(''); // Clear new key input
+          setIsUpdating(false);
+          setHasChanges(false);
+        }
+        
         if (validation) {
           updateSubscriptionData(validation);
         } else {
           resetSubscriptionData();
         }
+        
         if (running !== undefined) setRunning(running);
         if (updatedAt) setLastUpdated(new Date(updatedAt).toLocaleString());
         
@@ -186,38 +201,49 @@ const Opayapi = () => {
     }
   };
 
-  const validateApiKey = useCallback(async (showToast = true) => {
-    if (!apiKey) {
+  const validateApiKey = useCallback(async (keyToValidate, showToast = true) => {
+    if (!keyToValidate) {
       toast.error('API Key is required');
-      return;
+      return false;
     }
 
     setIsValidating(true);
     setValidationError(null);
 
     try {
-      const response = await axios.post(`${base_url}/api/opay/validate`, { apiKey });
+      const response = await axios.post(`${base_url}/api/opay/validate`, { apiKey: keyToValidate });
       
-      if (response.data && response.data.success) {
+      if (response.data) {
+        const isValid = response.data.valid === true;
+        
         updateSubscriptionData(response.data);
         
         setValidationHistory(prev => [
           {
             timestamp: new Date().toLocaleString(),
-            valid: response.data.valid || false,
-            reason: response.data.reason || 'Valid',
+            valid: isValid,
+            reason: response.data.reason || (isValid ? 'Valid' : 'Invalid'),
             deviceCount: response.data.deviceCount || 0,
             activeNumberCount: response.data.activeNumberCount || 0
           },
           ...prev.slice(0, 4)
         ]);
 
-        if (showToast) {
-          toast.success('API Key validated successfully');
+        if (isValid) {
+          if (showToast) {
+            toast.success('API Key validated successfully');
+          }
+          return true;
+        } else {
+          const errorMsg = response.data.message || 'Validation failed';
+          setValidationError(errorMsg);
+          if (showToast) {
+            toast.error(errorMsg);
+          }
+          return false;
         }
-      } else {
-        throw new Error(response.data?.message || 'Validation failed');
       }
+      return false;
     } catch (error) {
       console.error('Validation error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Validation failed';
@@ -235,17 +261,20 @@ const Opayapi = () => {
         ...prev.slice(0, 4)
       ]);
       
-      toast.error(errorMessage);
+      if (showToast) {
+        toast.error(errorMessage);
+      }
+      return false;
     } finally {
       setIsValidating(false);
     }
-  }, [apiKey, base_url, updateSubscriptionData]);
+  }, [base_url, updateSubscriptionData]);
 
   const toggleRunning = async () => {
     setRunningUpdating(true);
     try {
       const newState = !running;
-      const response = await axios.post(`${base_url}/api/opay/toggle-running`, { running: newState });
+      const response = await axios.patch(`${base_url}/api/opay/running`, { running: newState });
       
       if (response.data.success) {
         setRunning(newState);
@@ -261,8 +290,51 @@ const Opayapi = () => {
     }
   };
 
-  const handleValidateClick = () => {
-    validateApiKey(true);
+  const handleUpdateClick = () => {
+    setIsUpdating(true);
+    setNewApiKey(''); // Clear new key input
+    setValidationError(null);
+  };
+
+  const handleCancelUpdate = () => {
+    setIsUpdating(false);
+    setNewApiKey('');
+    setValidationError(null);
+    setHasChanges(false);
+  };
+
+  const handleNewKeyChange = (e) => {
+    setNewApiKey(e.target.value);
+    setHasChanges(true);
+    // Clear validation error when typing
+    if (validationError) setValidationError(null);
+  };
+
+  const handleSaveNewKey = async () => {
+    if (!newApiKey) {
+      toast.error('Please enter a new API key');
+      return;
+    }
+
+    // Validate the new key
+    const isValid = await validateApiKey(newApiKey, true);
+    
+    if (isValid) {
+      // Update successful
+      setCurrentApiKey(newApiKey);
+      setOriginalApiKey(newApiKey);
+      setIsUpdating(false);
+      setNewApiKey('');
+      setHasChanges(false);
+      toast.success('API Key updated successfully');
+      
+      // Refresh settings to get latest data
+      await loadSettings(false);
+    }
+  };
+
+  const handleValidateCurrentClick = () => {
+    validateApiKey(currentApiKey, true);
   };
 
   const handleRefreshSettings = async () => {
@@ -277,41 +349,17 @@ const Opayapi = () => {
     }
   };
 
-  const saveApiKey = async () => {
-    if (!apiKey) {
-      toast.error('Please enter an API key');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const response = await axios.post(`${base_url}/api/opay/save-key`, { apiKey });
-      
-      if (response.data.success) {
-        toast.success('API Key saved successfully');
-        await loadSettings(true);
-      } else {
-        throw new Error(response.data.message || 'Failed to save API key');
-      }
-    } catch (error) {
-      console.error('Failed to save API key:', error);
-      toast.error(error.message || 'Failed to save API key');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadSettings(true);
     
     const interval = setInterval(() => {
-      if (apiKey && subscriptionData.isValid) {
+      if (currentApiKey && subscriptionData.isValid) {
         loadSettings(false);
       }
     }, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [loadSettings, apiKey, subscriptionData.isValid]);
+  }, [loadSettings, currentApiKey, subscriptionData.isValid]);
 
   useEffect(() => {
     if (!subscriptionData.isValid) return;
@@ -372,6 +420,13 @@ const Opayapi = () => {
     return <FaTimesCircle className="text-red-500" />;
   };
 
+  // Mask API key for display
+  const maskApiKey = (key) => {
+    if (!key) return '';
+    if (key.length <= 8) return key;
+    return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
+  };
+
   return (
     <section className="font-sans min-h-screen bg-gray-50">
       <Header toggleSidebar={toggleSidebar} />
@@ -379,7 +434,7 @@ const Opayapi = () => {
       <div className="flex pt-16">
         <Sidebar isOpen={isSidebarOpen} />
         <main
-          className={`transition-all duration-300  flex-1 p-4 md:p-6 overflow-y-auto min-h-[calc(100vh-64px)] ${
+          className={`transition-all duration-300 flex-1 p-4 md:p-6 overflow-y-auto min-h-[calc(100vh-64px)] ${
             isSidebarOpen ? 'md:ml-[40%] lg:ml-[28%] xl:ml-[17%]' : 'ml-0'
           }`}
         >
@@ -401,12 +456,13 @@ const Opayapi = () => {
               <div className="flex items-center space-x-3 mt-4 md:mt-0">
                 <button
                   onClick={toggleRunning}
-                  disabled={runningUpdating}
+                  disabled={runningUpdating || !subscriptionData.isValid}
                   className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
                     running
                       ? 'bg-green-500 hover:bg-green-600 text-white'
                       : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                  } ${runningUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${(runningUpdating || !subscriptionData.isValid) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={!subscriptionData.isValid ? 'Valid API key required' : ''}
                 >
                   {running ? (
                     <>
@@ -433,7 +489,7 @@ const Opayapi = () => {
             </div>
           </div>
 
-          {/* API Key Section */}
+          {/* Current API Key Section */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
               <div className="flex items-center mb-4 md:mb-0">
@@ -441,35 +497,41 @@ const Opayapi = () => {
                   <FaKey className="text-xl text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-800">API Key</h2>
-                  <p className="text-gray-600 text-sm">Configure your Opay API key</p>
+                  <h2 className="text-lg font-semibold text-gray-800">Current API Key</h2>
+                  <p className="text-gray-600 text-sm">Your active Opay API key</p>
                 </div>
               </div>
               
               <div className="flex items-center space-x-3">
+                {!isUpdating && (
+                  <button
+                    onClick={handleUpdateClick}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors flex items-center"
+                  >
+                    Update API Key
+                  </button>
+                )}
                 <button
-                  onClick={saveApiKey}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
-                >
-                  Save Key
-                </button>
-                
-                <button
-                  onClick={handleValidateClick}
-                  disabled={isValidating || !apiKey}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  onClick={handleValidateCurrentClick}
+                  disabled={isValidating || !currentApiKey}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center ${
                     isValidating
                       ? 'bg-blue-500 text-white cursor-wait'
                       : subscriptionData.isValid
                       ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'bg-orange-500 hover:bg-orange-600 text-white'
-                  } ${!apiKey ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  } ${!currentApiKey ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {isValidating ? (
-                    <FaSync className="animate-spin" />
+                    <>
+                      <FaSync className="animate-spin mr-2" />
+                      Validating...
+                    </>
                   ) : (
-                    'Validate'
+                    <>
+                      <FaCheckCircle className="mr-2" />
+                      Revalidate
+                    </>
                   )}
                 </button>
               </div>
@@ -478,24 +540,26 @@ const Opayapi = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  API Key
+                  Current API Key
                 </label>
                 <div className="flex">
-                  <input
-                    type="text"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your Opay API Key"
-                    className="flex-1 border border-gray-300 rounded-l-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <div className="flex-1 border border-gray-300 rounded-l-lg px-4 py-3 bg-gray-50 font-mono text-gray-700">
+                    {maskApiKey(currentApiKey) || 'No API key configured'}
+                  </div>
                   <button
-                    onClick={() => copyToClipboard(apiKey)}
-                    disabled={!apiKey}
+                    onClick={() => copyToClipboard(currentApiKey)}
+                    disabled={!currentApiKey}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-r-lg border border-l-0 border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Copy full API key"
                   >
                     {copied ? <FaCheck /> : <FaCopy />}
                   </button>
                 </div>
+                {currentApiKey && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Full key: {currentApiKey.substring(0, 8)}...{currentApiKey.substring(currentApiKey.length - 4)}
+                  </p>
+                )}
               </div>
               
               {/* Status Display */}
@@ -505,179 +569,266 @@ const Opayapi = () => {
                   <span className="ml-2 font-medium">{getStatusText()}</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {validationError || 'Ready for validation'}
+                  {validationError || (subscriptionData.isValid ? 'Ready for use' : 'Validate API key to check status')}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center mb-4">
-                <div className="p-2 rounded-lg bg-blue-100 mr-3">
-                  <FaMobileAlt className="text-xl text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Devices</p>
-                  <p className="text-2xl font-semibold text-gray-800 mt-1">{subscriptionData.deviceCount}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center mb-4">
-                <div className="p-2 rounded-lg bg-green-100 mr-3">
-                  <FaUsers className="text-xl text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Active Numbers</p>
-                  <p className="text-2xl font-semibold text-gray-800 mt-1">{subscriptionData.activeCount}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center mb-4">
-                <div className="p-2 rounded-lg bg-purple-100 mr-3">
-                  <FaGlobe className="text-xl text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Domains</p>
-                  <p className="text-2xl font-semibold text-gray-800 mt-1">{subscriptionData.domains.length}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Subscription Details */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Subscription Info */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Subscription Details</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="font-medium text-gray-700">Plan</span>
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                    {subscriptionData.plan}
-                  </span>
+          {/* Update API Key Section - Only shown when updating */}
+          {isUpdating && (
+            <div className="bg-white rounded-xl border-2 border-orange-200 p-6 mb-6 ">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div className="flex items-center mb-4 md:mb-0">
+                  <div className="p-2 rounded-lg bg-orange-100 mr-3">
+                    <FaEdit className="text-xl text-orange-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">Update API Key</h2>
+                    <p className="text-gray-600 text-sm">Enter a new Opay API key</p>
+                  </div>
                 </div>
                 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">Primary Domain</label>
-                    <p className="text-gray-800">{subscriptionData.primaryDomain || 'No domain set'}</p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">All Domains</label>
-                    <div className="space-y-1">
-                      {subscriptionData.domains.length > 0 ? (
-                        subscriptionData.domains.map((domain, index) => (
-                          <div key={index} className="flex items-center text-gray-800">
-                            <FiChevronRight className="text-gray-400 mr-1" />
-                            {domain}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 italic">No domains registered</p>
-                      )}
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={handleCancelUpdate}
+                    className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveNewKey}
+                    disabled={isValidating || !newApiKey}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center ${
+                      isValidating
+                        ? 'bg-blue-500 text-white cursor-wait'
+                        : 'bg-green-500 hover:bg-green-600 text-white'
+                    } ${!newApiKey ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isValidating ? (
+                      <>
+                        <FaSync className="animate-spin mr-2" />
+                        Validating...
+                      </>
+                    ) : (
+                      <>
+                        <FaSave className="mr-2" />
+                        Save New Key
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New API Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newApiKey}
+                    onChange={handleNewKeyChange}
+                    placeholder="Enter your new Opay API Key"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    autoFocus
+                  />
+                  {hasChanges && (
+                    <p className="mt-2 text-sm text-orange-600">
+                      ⚠️ Click "Save New Key" to validate and save this API key
+                    </p>
+                  )}
+                </div>
+                
+                {/* Warning message */}
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-700 flex items-center">
+                    <FaEdit className="mr-2" />
+                    <span>
+                      <strong>Important:</strong> Updating the API key will immediately switch to the new key. 
+                      Make sure the new key is valid and has the correct permissions.
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stats Grid - Only show if there's valid subscription data */}
+          {subscriptionData.isValid && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                  <div className="flex items-center mb-4">
+                    <div className="p-2 rounded-lg bg-blue-100 mr-3">
+                      <FaMobileAlt className="text-xl text-blue-600" />
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Subscription Timeline */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Subscription Timeline</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Subscription ID</label>
-                  <div className="flex items-center">
-                    <code className="flex-1 bg-gray-50 px-3 py-2 rounded-lg text-gray-800 font-mono text-sm">
-                      {subscriptionData.subscriptionId || 'No subscription ID'}
-                    </code>
-                    <button
-                      onClick={() => copyToClipboard(subscriptionData.subscriptionId)}
-                      disabled={!subscriptionData.subscriptionId}
-                      className="ml-2 p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                    >
-                      <FaCopy />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-600 mb-1">End Date</label>
-                    <p className="text-gray-800 font-medium">{subscriptionData.endDate}</p>
-                  </div>
-                  
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-600 mb-1">Latest End Date</label>
-                    <p className="text-gray-800 font-medium">{subscriptionData.latestEndDate}</p>
-                  </div>
-                </div>
-                
-                <div className={`p-4 rounded-lg ${
-                  subscriptionData.expireDate.includes('Expired') 
-                    ? 'bg-red-50 border border-red-200' 
-                    : 'bg-green-50 border border-green-200'
-                }`}>
-                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Expires In</p>
-                      <p className={`text-lg font-semibold mt-1 ${
-                        subscriptionData.expireDate.includes('Expired') ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {subscriptionData.expireDate}
-                      </p>
+                      <p className="text-sm font-medium text-gray-600">Devices</p>
+                      <p className="text-2xl font-semibold text-gray-800 mt-1">{subscriptionData.deviceCount}</p>
                     </div>
-                    <MdTimer className="text-2xl text-gray-400" />
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                  <div className="flex items-center mb-4">
+                    <div className="p-2 rounded-lg bg-green-100 mr-3">
+                      <FaUsers className="text-xl text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Active Numbers</p>
+                      <p className="text-2xl font-semibold text-gray-800 mt-1">{subscriptionData.activeCount}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                  <div className="flex items-center mb-4">
+                    <div className="p-2 rounded-lg bg-purple-100 mr-3">
+                      <FaGlobe className="text-xl text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Domains</p>
+                      <p className="text-2xl font-semibold text-gray-800 mt-1">{subscriptionData.domains.length}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Countdown Timer */}
-          {subscriptionData.isValid && subscriptionData.days > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
-              <div className="flex items-center mb-6">
-                <div className="p-2 rounded-lg bg-orange-100 mr-3">
-                  <FaCalendarAlt className="text-xl text-orange-600" />
+              {/* Subscription Details */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Subscription Info */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Subscription Details</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <span className="font-medium text-gray-700">Plan</span>
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                        {subscriptionData.plan}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Primary Domain</label>
+                        <p className="text-gray-800">{subscriptionData.primaryDomain || 'No domain set'}</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">All Domains</label>
+                        <div className="space-y-1">
+                          {subscriptionData.domains.length > 0 ? (
+                            subscriptionData.domains.map((domain, index) => (
+                              <div key={index} className="flex items-center text-gray-800">
+                                <FiChevronRight className="text-gray-400 mr-1" />
+                                {domain}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-gray-500 italic">No domains registered</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Subscription Countdown</h3>
-                  <p className="text-gray-600 text-sm">Time remaining until expiration</p>
+                
+                {/* Subscription Timeline */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Subscription Timeline</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Subscription ID</label>
+                      <div className="flex items-center">
+                        <code className="flex-1 bg-gray-50 px-3 py-2 rounded-lg text-gray-800 font-mono text-sm">
+                          {subscriptionData.subscriptionId || 'No subscription ID'}
+                        </code>
+                        <button
+                          onClick={() => copyToClipboard(subscriptionData.subscriptionId)}
+                          disabled={!subscriptionData.subscriptionId}
+                          className="ml-2 p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                          title="Copy to clipboard"
+                        >
+                          <FaCopy />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">End Date</label>
+                        <p className="text-gray-800 font-medium">{subscriptionData.endDate}</p>
+                      </div>
+                      
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Latest End Date</label>
+                        <p className="text-gray-800 font-medium">{subscriptionData.latestEndDate}</p>
+                      </div>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg ${
+                      subscriptionData.expireDate.includes('Expired') 
+                        ? 'bg-red-50 border border-red-200' 
+                        : subscriptionData.expireDate === 'No expiration date'
+                        ? 'bg-gray-50 border border-gray-200'
+                        : 'bg-green-50 border border-green-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Expires In</p>
+                          <p className={`text-lg font-semibold mt-1 ${
+                            subscriptionData.expireDate.includes('Expired') ? 'text-red-600' : 
+                            subscriptionData.expireDate === 'No expiration date' ? 'text-gray-600' : 'text-green-600'
+                          }`}>
+                            {subscriptionData.expireDate}
+                          </p>
+                        </div>
+                        <MdTimer className="text-2xl text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.days}</div>
-                  <div className="text-sm text-gray-600">Days</div>
+
+              {/* Countdown Timer */}
+              {subscriptionData.days > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
+                  <div className="flex items-center mb-6">
+                    <div className="p-2 rounded-lg bg-orange-100 mr-3">
+                      <FaCalendarAlt className="text-xl text-orange-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800">Subscription Countdown</h3>
+                      <p className="text-gray-600 text-sm">Time remaining until expiration</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.days}</div>
+                      <div className="text-sm text-gray-600">Days</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.hours}</div>
+                      <div className="text-sm text-gray-600">Hours</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.minutes}</div>
+                      <div className="text-sm text-gray-600">Minutes</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.seconds}</div>
+                      <div className="text-sm text-gray-600">Seconds</div>
+                    </div>
+                  </div>
                 </div>
-                
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.hours}</div>
-                  <div className="text-sm text-gray-600">Hours</div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.minutes}</div>
-                  <div className="text-sm text-gray-600">Minutes</div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-800 mb-1">{subscriptionData.seconds}</div>
-                  <div className="text-sm text-gray-600">Seconds</div>
-                </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
 
           {/* History & Webhooks */}
@@ -718,7 +869,9 @@ const Opayapi = () => {
                       <div className="mt-2 text-xs text-gray-600">
                         Devices: {entry.deviceCount} • Numbers: {entry.activeNumberCount}
                         {entry.error && (
-                          <div className="mt-1 text-red-500 truncate">{entry.error}</div>
+                          <div className="mt-1 text-red-500 truncate" title={entry.error}>
+                            {entry.error}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -746,17 +899,22 @@ const Opayapi = () => {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Deposit Callback URL</label>
-                  <code className="block w-full bg-gray-50 px-3 py-2 rounded-lg text-sm text-gray-800 font-mono break-all">
-                    {base_url}/api/opay/callback-deposit
-                  </code>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Status Callback URL</label>
-                  <code className="block w-full bg-gray-50 px-3 py-2 rounded-lg text-sm text-gray-800 font-mono break-all">
-                    {base_url}/api/opay/status
-                  </code>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">OraclePay Callback URL</label>
+                  <div className="flex items-center">
+                    <code className="flex-1 bg-gray-50 px-3 py-2 rounded-lg text-sm text-gray-800 font-mono break-all">
+                      {base_url}/api/opay/oraclepay-callback
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(`${base_url}/api/opay/oraclepay-callback`)}
+                      className="ml-2 p-2 text-gray-500 hover:text-gray-700"
+                      title="Copy to clipboard"
+                    >
+                      <FaCopy />
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Configure this URL in your OraclePay dashboard for deposit notifications
+                  </p>
                 </div>
                 
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -772,6 +930,14 @@ const Opayapi = () => {
                     {running ? 'Running' : 'Stopped'}
                   </span>
                 </div>
+
+                {subscriptionData.isValid && (
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-700">
+                      <span className="font-medium">✓ API Key Valid</span> - Integration ready to process payments
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

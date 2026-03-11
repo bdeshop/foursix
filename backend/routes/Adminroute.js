@@ -260,9 +260,6 @@ const uploadPromotional = multer({
   },
   fileFilter: fileFilter,
 });
-
-// Apply admin authentication middleware to all routes
-Adminrouter.use(adminAuth);
 // ==================== COMPREHENSIVE DASHBOARD ROUTE ====================
 
 // GET comprehensive dashboard data
@@ -2634,6 +2631,7 @@ const Game = require("../models/Game");
 // const User = require("../models/User");
 const Deposit = require("../models/Deposit");
 
+
 // Configure multer for game images
 const gameStorage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -2769,21 +2767,24 @@ Adminrouter.post(
   ]),
   async (req, res) => {
     try {
-      const { name, provider, featured, status, gameApiID, category, fullScreen } = req.body;
+      const { 
+        name, 
+        provider, 
+        featured, 
+        status, 
+        gameApiID, 
+        category, 
+        fullScreen,
+        defaultImage  // URL from games API
+      } = req.body;
       
-      // Check if gameApiID already exists BEFORE processing files
+      // Check if gameApiID already exists
       const existingGame = await Game.findOne({ gameApiID: gameApiID });
       if (existingGame) {
         return res.status(400).json({ 
           error: `Game API ID "${gameApiID}" is already in use!` 
         });
       }
-
-      const gameProviderFont = await GameProvider.findOne({ name: provider });
-      if (!gameProviderFont) {
-        return res.status(400).json({ error: "Game provider font not found" });
-      }
-
       // Enhanced validation
       const requiredFields = { name, provider, category, gameApiID };
       const missingFields = Object.keys(requiredFields).filter(field => !requiredFields[field]);
@@ -2794,9 +2795,21 @@ Adminrouter.post(
         });
       }
 
-      if (!req.files || !req.files.portraitImage || !req.files.landscapeImage) {
+      let portraitImageValue;
+      let landscapeImageValue;
+
+      // Check if using uploaded files or default image
+      if (req.files && req.files.portraitImage && req.files.landscapeImage) {
+        // Using uploaded files - store file paths
+        portraitImageValue = `/uploads/games/portrait/${req.files.portraitImage[0].filename}`;
+        landscapeImageValue = `/uploads/games/landscape/${req.files.landscapeImage[0].filename}`;
+      } else if (defaultImage) {
+        // Using default image from API - use the same URL for both
+        portraitImageValue = defaultImage;
+        landscapeImageValue = defaultImage;
+      } else {
         return res.status(400).json({ 
-          error: "Both portrait and landscape images are required" 
+          error: "Either upload images or provide default image URL" 
         });
       }
 
@@ -2805,8 +2818,9 @@ Adminrouter.post(
         gameId: gameApiID,
         provider,
         category,
-        portraitImage: `/uploads/games/portrait/${req.files.portraitImage[0].filename}`,
-        landscapeImage: `/uploads/games/landscape/${req.files.landscapeImage[0].filename}`,
+        portraitImage: portraitImageValue,
+        landscapeImage: landscapeImageValue,
+        defaultImage: defaultImage || null, // Store the default image URL if provided
         featured: featured === "true" || featured === true,
         status: status !== undefined ? status : true,
         fullScreen: fullScreen === "true" || fullScreen === true,
@@ -2831,7 +2845,7 @@ Adminrouter.post(
     }
   }
 );
-
+// PUT update game
 // PUT update game
 Adminrouter.put(
   "/games/:id",
@@ -2845,7 +2859,9 @@ Adminrouter.put(
       if (!game) {
         return res.status(404).json({ error: "Game not found" });
       }
-      console.log("df",req.body)
+      
+      console.log("Update request body:", req.body);
+      console.log("Update request files:", req.files);
 
       // Update fields
       if (req.body.name) game.name = req.body.name;
@@ -2862,14 +2878,19 @@ Adminrouter.put(
       }
       if (req.body.provider) game.provider = req.body.provider;
       if (req.body.category) game.category = req.body.category;
-      if (req.body.featured !== undefined) game.featured = req.body.featured;
-      if (req.body.status !== undefined) game.status = req.body.status;
-      if (req.body.fullScreen !== undefined) game.fullScreen = req.body.fullScreen;
+      if (req.body.featured !== undefined) game.featured = req.body.featured === "true" || req.body.featured === true;
+      if (req.body.status !== undefined) game.status = req.body.status === "true" || req.body.status === true;
+      if (req.body.fullScreen !== undefined) game.fullScreen = req.body.fullScreen === "true" || req.body.fullScreen === true;
 
-      // Handle portrait image update
+      // Handle default image URL update
+      if (req.body.defaultImage) {
+        game.defaultImage = req.body.defaultImage;
+      }
+
+      // Handle portrait image update (uploaded file)
       if (req.files && req.files.portraitImage) {
-        // Delete old portrait image
-        if (game.portraitImage) {
+        // Delete old portrait image if it's a local file (not a URL)
+        if (game.portraitImage && !game.portraitImage.startsWith('http')) {
           const oldImagePath = path.join(
             __dirname,
             "..",
@@ -2883,10 +2904,10 @@ Adminrouter.put(
         game.portraitImage = `/uploads/games/portrait/${req.files.portraitImage[0].filename}`;
       }
 
-      // Handle landscape image update
+      // Handle landscape image update (uploaded file)
       if (req.files && req.files.landscapeImage) {
-        // Delete old landscape image
-        if (game.landscapeImage) {
+        // Delete old landscape image if it's a local file (not a URL)
+        if (game.landscapeImage && !game.landscapeImage.startsWith('http')) {
           const oldImagePath = path.join(
             __dirname,
             "..",
@@ -2898,6 +2919,12 @@ Adminrouter.put(
           }
         }
         game.landscapeImage = `/uploads/games/landscape/${req.files.landscapeImage[0].filename}`;
+      }
+
+      // If defaultImage is provided and no new uploaded images, update images with default URL
+      if (req.body.defaultImage && !req.files?.portraitImage && !req.files?.landscapeImage) {
+        game.portraitImage = req.body.defaultImage;
+        game.landscapeImage = req.body.defaultImage;
       }
 
       await game.save();
@@ -2988,6 +3015,293 @@ Adminrouter.delete("/games/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete game" });
   }
 });
+// POST create multiple games at once
+Adminrouter.post(
+  "/games/bulk",
+  uploadGameImages.fields([
+    { name: "portraitImage", maxCount: 10 }, // Adjust maxCount as needed
+    { name: "landscapeImage", maxCount: 10 },
+  ]),
+  async (req, res) => {
+    try {
+      let gamesData = req.body.games;
+      
+      // Parse gamesData if it's a string (when sent as FormData)
+      if (typeof gamesData === 'string') {
+        gamesData = JSON.parse(gamesData);
+      }
+      
+      if (!Array.isArray(gamesData) || gamesData.length === 0) {
+        return res.status(400).json({ 
+          error: "Games data must be a non-empty array" 
+        });
+      }
+
+      // Check if gamesData size exceeds limit
+      if (gamesData.length > 50) {
+        return res.status(400).json({ 
+          error: "Cannot add more than 50 games at once" 
+        });
+      }
+
+      const results = {
+        successful: [],
+        failed: []
+      };
+
+      // Process each game
+      for (let i = 0; i < gamesData.length; i++) {
+        const gameData = gamesData[i];
+        const gameIndex = i;
+
+        try {
+          // Validate required fields
+          const requiredFields = ['name', 'provider', 'category', 'gameApiID'];
+          const missingFields = requiredFields.filter(field => !gameData[field]);
+          
+          if (missingFields.length > 0) {
+            results.failed.push({
+              game: gameData,
+              error: `Missing required fields: ${missingFields.join(', ')}`
+            });
+            continue;
+          }
+
+          // Check if gameApiID already exists
+          const existingGame = await Game.findOne({ gameApiID: gameData.gameApiID });
+          if (existingGame) {
+            results.failed.push({
+              game: gameData,
+              error: `Game API ID "${gameData.gameApiID}" is already in use`
+            });
+            continue;
+          }
+
+          let portraitImageValue;
+          let landscapeImageValue;
+
+          // Handle images for this specific game
+          // For bulk upload, we need to map files to specific games
+          // This assumes files are named or indexed in a way that matches the game data
+          if (req.files && req.files.portraitImage && req.files.portraitImage[gameIndex]) {
+            portraitImageValue = `/uploads/games/portrait/${req.files.portraitImage[gameIndex].filename}`;
+          } else if (req.files && req.files.landscapeImage && req.files.landscapeImage[gameIndex]) {
+            landscapeImageValue = `/uploads/games/landscape/${req.files.landscapeImage[gameIndex].filename}`;
+          } else if (gameData.defaultImage) {
+            // Use default image URL if provided
+            portraitImageValue = gameData.defaultImage;
+            landscapeImageValue = gameData.defaultImage;
+          } else {
+            results.failed.push({
+              game: gameData,
+              error: "No image provided for this game"
+            });
+            continue;
+          }
+
+          // If only one image type is provided, use it for both
+          if (portraitImageValue && !landscapeImageValue) {
+            landscapeImageValue = portraitImageValue;
+          } else if (!portraitImageValue && landscapeImageValue) {
+            portraitImageValue = landscapeImageValue;
+          }
+
+          const newGame = new Game({
+            name: gameData.name,
+            gameId: gameData.gameApiID,
+            provider: gameData.provider,
+            category: gameData.category,
+            portraitImage: portraitImageValue,
+            landscapeImage: landscapeImageValue,
+            defaultImage: gameData.defaultImage || null,
+            featured: gameData.featured === "true" || gameData.featured === true || false,
+            status: gameData.status !== undefined ? gameData.status : true,
+            fullScreen: gameData.fullScreen === "true" || gameData.fullScreen === true || false,
+            gameApiID: gameData.gameApiID,
+          });
+
+          const savedGame = await newGame.save();
+          results.successful.push({
+            game: savedGame,
+            message: "Game created successfully"
+          });
+
+        } catch (gameError) {
+          console.error(`Error creating game at index ${gameIndex}:`, gameError);
+          results.failed.push({
+            game: gameData,
+            error: gameError.message || "Failed to create game"
+          });
+        }
+      }
+
+      // Return appropriate response based on results
+      if (results.successful.length === 0) {
+        return res.status(400).json({
+          message: "No games were created successfully",
+          results
+        });
+      }
+
+      if (results.failed.length > 0) {
+        return res.status(207).json({
+          message: `Created ${results.successful.length} game(s), failed to create ${results.failed.length} game(s)`,
+          results
+        });
+      }
+
+      res.status(201).json({
+        message: `Successfully created ${results.successful.length} game(s)`,
+        results
+      });
+
+    } catch (error) {
+      console.error("Error in bulk game creation:", error);
+      res.status(500).json({ 
+        error: "Failed to process bulk game creation",
+        details: error.message 
+      });
+    }
+  }
+);
+
+// Alternative: POST create multiple games using JSON only (no file uploads)
+Adminrouter.post("/games/bulk-json", async (req, res) => {
+  try {
+    const gamesData = req.body.games;
+    
+    if (!Array.isArray(gamesData) || gamesData.length === 0) {
+      return res.status(400).json({ 
+        error: "Games data must be a non-empty array" 
+      });
+    }
+
+    // Check if gamesData size exceeds limit
+    if (gamesData.length > 100) {
+      return res.status(400).json({ 
+        error: "Cannot add more than 100 games at once" 
+      });
+    }
+
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    // Process each game
+    for (const gameData of gamesData) {
+      try {
+        // Validate required fields
+        const requiredFields = ['name', 'provider', 'category', 'gameApiID'];
+        const missingFields = requiredFields.filter(field => !gameData[field]);
+        
+        if (missingFields.length > 0) {
+          results.failed.push({
+            game: gameData,
+            error: `Missing required fields: ${missingFields.join(', ')}`
+          });
+          continue;
+        }
+
+        // Check if gameApiID already exists
+        const existingGame = await Game.findOne({ gameApiID: gameData.gameApiID });
+        if (existingGame) {
+          results.failed.push({
+            game: gameData,
+            error: `Game API ID "${gameData.gameApiID}" is already in use`
+          });
+          continue;
+        }
+
+        // Validate image URLs if provided
+        if (gameData.portraitImage && !isValidUrl(gameData.portraitImage)) {
+          results.failed.push({
+            game: gameData,
+            error: "Invalid portrait image URL"
+          });
+          continue;
+        }
+
+        if (gameData.landscapeImage && !isValidUrl(gameData.landscapeImage)) {
+          results.failed.push({
+            game: gameData,
+            error: "Invalid landscape image URL"
+          });
+          continue;
+        }
+
+        // Use provided image URLs or default to a placeholder
+        const portraitImage = gameData.portraitImage || gameData.defaultImage || 'https://via.placeholder.com/300x400';
+        const landscapeImage = gameData.landscapeImage || gameData.defaultImage || 'https://via.placeholder.com/400x300';
+
+        const newGame = new Game({
+          name: gameData.name,
+          gameId: gameData.gameApiID,
+          provider: gameData.provider,
+          category: gameData.category,
+          portraitImage: portraitImage,
+          landscapeImage: landscapeImage,
+          defaultImage: gameData.defaultImage || null,
+          featured: gameData.featured === true || false,
+          status: gameData.status !== undefined ? gameData.status : true,
+          fullScreen: gameData.fullScreen === true || false,
+          gameApiID: gameData.gameApiID,
+        });
+
+        const savedGame = await newGame.save();
+        results.successful.push(savedGame);
+
+      } catch (gameError) {
+        console.error("Error creating game:", gameError);
+        results.failed.push({
+          game: gameData,
+          error: gameError.message || "Failed to create game"
+        });
+      }
+    }
+
+    // Return appropriate response
+    if (results.successful.length === 0) {
+      return res.status(400).json({
+        message: "No games were created successfully",
+        results
+      });
+    }
+
+    if (results.failed.length > 0) {
+      return res.status(207).json({
+        message: `Created ${results.successful.length} game(s), failed to create ${results.failed.length} game(s)`,
+        results: {
+          successful: results.successful,
+          failed: results.failed
+        }
+      });
+    }
+
+    res.status(201).json({
+      message: `Successfully created ${results.successful.length} game(s)`,
+      games: results.successful
+    });
+
+  } catch (error) {
+    console.error("Error in bulk game creation:", error);
+    res.status(500).json({ 
+      error: "Failed to process bulk game creation",
+      details: error.message 
+    });
+  }
+});
+
+// Helper function to validate URLs (add this near the top of your file)
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 
 
 // GET game categories for dropdown
@@ -9527,16 +9841,16 @@ Adminrouter.get("/menu-games/:id", async (req, res) => {
 // POST create new menu game with image upload
 Adminrouter.post("/menu-games", uploadMenuGame.single("image"), async (req, res) => {
     try {
-        const { category, categoryname, name, gameId, status = true } = req.body;
-
+        const { category, categoryname, name, gameId, provider, status = true } = req.body;
+  console.log(req.body)
         // Validation
         if (!req.file) {
             return res.status(400).json({ error: "Image is required" });
         }
 
-        if (!category || !categoryname || !name || !gameId) {
+        if (!category || !categoryname || !name || !gameId || !provider) {
             return res.status(400).json({
-                error: "Category, category name, game name, and game ID are required"
+                error: "Category, category name, game name, game ID, and provider are required"
             });
         }
 
@@ -9559,6 +9873,7 @@ Adminrouter.post("/menu-games", uploadMenuGame.single("image"), async (req, res)
             categoryname,
             name,
             gameId,
+            provider,
             status
         };
 
@@ -9591,7 +9906,7 @@ Adminrouter.post("/menu-games", uploadMenuGame.single("image"), async (req, res)
 // PUT update menu game with optional image upload
 Adminrouter.put("/menu-games/:id", uploadMenuGame.single("image"), async (req, res) => {
     try {
-        const { category, categoryname, name, gameId, status } = req.body;
+        const { category, categoryname, name, gameId, provider, status } = req.body;
 
         const game = await MenuGame.findById(req.params.id);
         if (!game) {
@@ -9608,6 +9923,7 @@ Adminrouter.put("/menu-games/:id", uploadMenuGame.single("image"), async (req, r
         if (category) game.category = category;
         if (categoryname) game.categoryname = categoryname;
         if (name) game.name = name;
+        if (provider) game.provider = provider;
         if (status !== undefined) game.status = status;
 
         // Handle image update
@@ -9690,7 +10006,6 @@ Adminrouter.put("/menu-games/:id/status", async (req, res) => {
         res.status(500).json({ error: "Failed to update menu game status" });
     }
 });
-
 // DELETE menu game
 Adminrouter.delete("/menu-games/:id", async (req, res) => {
     try {

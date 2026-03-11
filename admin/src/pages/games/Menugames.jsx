@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaEdit, FaTrash, FaImage } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaImage, FaUpload, FaTimes, FaEye } from 'react-icons/fa';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import axios from 'axios';
@@ -10,15 +10,14 @@ const Menugames = () => {
   const base_url = import.meta.env.VITE_API_KEY_Base_URL;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [formData, setFormData] = useState({
-    category: '',
-    categoryname: '',
+    category: 'sports',
+    categoryname: 'Sports',
     name: '',
-    gameId: ''
+    gameId: '',
+    provider: ''
   });
-  const [categories, setCategories] = useState([]);
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
@@ -28,24 +27,15 @@ const Menugames = () => {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [currentImage, setCurrentImage] = useState(null);
+  const [imageError, setImageError] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   
-  // Fetch categories and games on component mount
+  // Fetch games on component mount
   useEffect(() => {
-    fetchCategories();
     fetchGames();
   }, []);
-
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get(`${base_url}/api/admin/game-categories`);
-      setCategories(response.data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to fetch categories');
-    }
-  };
 
   const fetchGames = async () => {
     try {
@@ -79,48 +69,72 @@ const Menugames = () => {
     });
   };
 
-  const handleCategoryChange = (e) => {
-    const categoryId = e.target.value;
-    const selectedCategory = categories.find(cat => cat._id === categoryId);
+  // Handle drag events
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  // Handle drop event
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
     
-    setFormData({
-      ...formData,
-      category: categoryId,
-      categoryname: selectedCategory ? selectedCategory.name : ''
-    });
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      validateAndSetImage(file);
+    }
   };
 
   // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Check file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
-        return;
-      }
-      
-      // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('Image size should be less than 10MB');
-        return;
-      }
-      
-      setImageFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+      validateAndSetImage(file);
     }
+  };
+
+  // Validate and set image
+  const validateAndSetImage = (file) => {
+    setImageError(false);
+    
+    // Check file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please select a valid image file (JPG, PNG, GIF, WEBP)');
+      setImageError(true);
+      return;
+    }
+    
+    // Check file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error('Image size should be less than 5MB');
+      setImageError(true);
+      return;
+    }
+    
+    setImageFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Remove selected image
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setImageError(false);
     if (document.getElementById('imageInput')) {
       document.getElementById('imageInput').value = '';
     }
@@ -135,16 +149,6 @@ const Menugames = () => {
       return;
     }
     
-    if (!formData.category) {
-      toast.error('Please select a category');
-      return;
-    }
-    
-    if (!formData.categoryname) {
-      toast.error('Category name is required');
-      return;
-    }
-    
     if (!formData.name) {
       toast.error('Game name is required');
       return;
@@ -152,6 +156,11 @@ const Menugames = () => {
     
     if (!formData.gameId) {
       toast.error('Game ID is required');
+      return;
+    }
+
+    if (!formData.provider) {
+      toast.error('Provider is required');
       return;
     }
 
@@ -164,6 +173,7 @@ const Menugames = () => {
       formDataObj.append('categoryname', formData.categoryname);
       formDataObj.append('name', formData.name);
       formDataObj.append('gameId', formData.gameId);
+      formDataObj.append('provider', formData.provider);
       formDataObj.append('status', 'true');
       
       // Only append image if it's a new file
@@ -205,14 +215,16 @@ const Menugames = () => {
   // Reset form function
   const resetForm = () => {
     setFormData({
-      category: '',
-      categoryname: '',
+      category: 'sports',
+      categoryname: 'Sports',
       name: '',
-      gameId: ''
+      gameId: '',
+      provider: ''
     });
     setImageFile(null);
     setImagePreview(null);
     setCurrentImage(null);
+    setImageError(false);
     setIsEditing(false);
     setEditingId(null);
     if (document.getElementById('imageInput')) {
@@ -244,10 +256,11 @@ const Menugames = () => {
       const freshGameData = await fetchSingleGame(game._id);
       if (freshGameData) {
         setFormData({
-          category: freshGameData.category._id || freshGameData.category,
-          categoryname: freshGameData.categoryname || freshGameData.category?.name || '',
+          category: 'sports',
+          categoryname: 'Sports',
           name: freshGameData.name,
-          gameId: freshGameData.gameId
+          gameId: freshGameData.gameId,
+          provider: freshGameData.provider || ''
         });
         
         // Set current image for preview
@@ -303,6 +316,7 @@ const Menugames = () => {
   // Get image URL for display
   const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
+    if (imagePath.startsWith('http')) return imagePath;
     return `${base_url}${imagePath}`;
   };
 
@@ -319,162 +333,204 @@ const Menugames = () => {
           }`}
         >
           <div className="w-full mx-auto">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">Menu Games</h1>
+            <h1 className="text-2xl font-bold text-gray-800 mb-6">Menu Games - Sports Category</h1>
             
             {/* Add Game Form */}
-            <div className="bg-white rounded-[5px] p-6 border border-gray-200 mb-8">
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-8">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
                 {isEditing ? 'Edit Game' : 'Add New Game'}
               </h2>
+              
+              {/* Category Info Banner */}
+              <div className="mb-6 bg-orange-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-orange-700 font-medium">Category: Sports</span>
+                    <span className="ml-2 text-sm text-orange-600">(All games will be added to Sports category)</span>
+                  </div>
+                </div>
+              </div>
+              
               <form onSubmit={handleSubmit}>
-                {/* Image Upload Section */}
+                {/* Compact Image Upload Section */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Game Image {!isEditing && <span className="text-red-500">*</span>}
                   </label>
                   
-                  <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                    {/* Image Preview */}
-                    <div className="w-48 h-48 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50 overflow-hidden">
-                      {imagePreview ? (
-                        <div className="relative w-full h-full">
+                  <div 
+                    className={`relative border-2 border-dashed rounded-lg p-4 transition-all ${
+                      dragActive 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : imageError 
+                        ? 'border-red-300 bg-red-50' 
+                        : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                    }`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                  >
+                    <input
+                      type="file"
+                      id="imageInput"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    
+                    {imagePreview || currentImage ? (
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                           <img 
-                            src={imagePreview} 
-                            alt="Preview" 
+                            src={imagePreview || currentImage} 
+                            alt={imagePreview ? "Preview" : "Current image"} 
                             className="w-full h-full object-cover"
                           />
-                          <button
-                            type="button"
-                            onClick={removeImage}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                          >
-                            <FaTrash className="w-4 h-4" />
-                          </button>
+                          {imagePreview && (
+                            <div className="absolute top-0 left-0 bg-orange-500 text-white text-[10px] px-1 py-0.5 rounded-br-lg">
+                              New
+                            </div>
+                          )}
                         </div>
-                      ) : currentImage ? (
-                        <div className="relative w-full h-full">
-                          <img 
-                            src={currentImage} 
-                            alt="Current" 
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2">
-                            Current Image
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-700 truncate">
+                            {imageFile ? imageFile.name : (currentImage ? 'Current image' : '')}
+                          </p>
+                          <p className="text-xs text-gray-500 mb-2">
+                            {imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : 'Existing image'}
+                          </p>
+                          <div className="flex gap-2">
+                            <label
+                              htmlFor="imageInput"
+                              className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              <FaUpload className="mr-1 text-gray-500 text-xs" />
+                              Change
+                            </label>
+                            {(imagePreview || currentImage) && (
+                              <button
+                                type="button"
+                                onClick={removeImage}
+                                className="inline-flex items-center px-3 py-1.5 bg-red-50 border border-red-300 rounded text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                              >
+                                <FaTimes className="mr-1" />
+                                Remove
+                              </button>
+                            )}
                           </div>
                         </div>
-                      ) : (
-                        <div className="text-center p-4">
-                          <FaImage className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-500">No image selected</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                            <FaImage className="w-5 h-5 text-gray-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">
+                              Drop image or click to upload
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              JPG, PNG, GIF, WEBP (Max 5MB)
+                            </p>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    
-                    {/* Upload Controls */}
-                    <div className="flex-1">
-                      <div className="mb-4">
-                        <input
-                          type="file"
-                          id="imageInput"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          className="hidden"
-                        />
                         <label
                           htmlFor="imageInput"
-                          className="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 cursor-pointer transition-colors"
+                          className="inline-flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 cursor-pointer transition-colors shadow-sm"
                         >
-                          <FaImage className="mr-2" />
-                          {imagePreview || currentImage ? 'Change Image' : 'Select Image'}
+                          <FaUpload className="mr-2 text-xs" />
+                          Browse
                         </label>
-                        {imagePreview && (
-                          <button
-                            type="button"
-                            onClick={removeImage}
-                            className="ml-3 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                          >
-                            Remove
-                          </button>
-                        )}
                       </div>
+                    )}
+                    
+                    {imageError && (
+                      <div className="mt-3 p-2 bg-red-100 border border-red-200 rounded text-xs text-red-600">
+                        Please select a valid image file under 5MB
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Name (Read-only) */}
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value="Sports"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed text-sm"
+                      disabled
+                      readOnly
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">Read-only</span>
                     </div>
                   </div>
                 </div>
-                
-                {/* Category Selection */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category <span className="text-red-500">*</span></label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleCategoryChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color"
-                    required
-                  >
-                    <option value="">Select a category</option>
-                    {categories
-                      .filter(category => category.status)
-                      .map((category) => (
-                        <option key={category._id} value={category._id}>
-                          {category.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                {/* Category Name Field */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category Name <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    name="categoryname"
-                    value={formData.categoryname}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color bg-gray-50"
-                    placeholder="Category name will auto-fill"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Auto-filled from selected category. You can edit if needed.
-                  </p>
-                </div>
 
                 {/* Game Name Field */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Game Name <span className="text-red-500">*</span></label>
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Game Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-shadow text-sm"
                     placeholder="Enter game name"
                     required
                   />
                 </div>
 
+                {/* Provider Field */}
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Provider <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="provider"
+                    value={formData.provider}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-shadow text-sm"
+                    placeholder="Enter provider name"
+                    required
+                  />
+                </div>
+
                 {/* Game ID Field */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Game ID <span className="text-red-500">*</span></label>
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Game ID <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="gameId"
                     value={formData.gameId}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[3px] outline-theme_color"
-                    placeholder="Enter game ID"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-shadow text-sm"
+                    placeholder="Enter unique game ID"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Unique identifier for the game</p>
                 </div>
                 
                 {/* Submit Button */}
-                <div className="flex justify-end mt-8 space-x-4">
+                <div className="flex justify-end mt-6 space-x-3">
                   {isEditing && (
                     <button
                       type="button"
                       onClick={cancelEdit}
-                      className="px-6 py-2 bg-gray-500 text-white font-medium rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                      className="px-5 py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors text-sm"
                     >
                       Cancel
                     </button>
@@ -482,11 +538,11 @@ const Menugames = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-2 bg-orange-500 text-white font-medium rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] text-sm"
                   >
                     {loading ? (
-                      <span className="flex items-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <span className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -500,88 +556,101 @@ const Menugames = () => {
             
             {/* Games Table */}
             <div className="">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">All Games</h2>
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Sports Games</h2>
               
               {loading && games.length === 0 ? (
                 <div className="flex justify-center items-center h-40">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
               ) : games.length === 0 ? (
-                <div className="bg-white p-8 rounded-lg text-center">
-                  <p className="text-gray-500">No games found. Add your first game above.</p>
+                <div className="bg-white p-8 rounded-xl text-center border border-gray-200">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-3 flex items-center justify-center">
+                    <FaImage className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <p className="text-gray-600 text-base mb-1">No sports games found</p>
+                  <p className="text-gray-400 text-sm">Add your first game using the form above</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto border-[1px] border-gray-200 rounded-lg">
+                <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-theme_color">
+                    <thead className="bg-orange-600">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                           Image
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
-                          Category Name
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          Category
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                           Game Name
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                          Provider
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                           Game ID
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                           Status
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs md:text-sm font-medium text-white uppercase tracking-wider">
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {games.map((game) => (
-                        <tr key={game._id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={game._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center">
                               {game.image ? (
                                 <div className="relative group">
                                   <img 
                                     src={getImageUrl(game.image)} 
                                     alt={game.name}
-                                    className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                    className="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-sm"
                                     onError={(e) => {
-                                      e.target.src = 'https://via.placeholder.com/64x64?text=No+Image';
+                                      e.target.src = 'https://via.placeholder.com/48x48?text=No+Image';
                                     }}
                                   />
-                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                                     <button
+                                      type="button"
                                       onClick={() => {
                                         window.open(getImageUrl(game.image), '_blank');
                                       }}
-                                      className="text-white text-xs bg-blue-500 px-2 py-1 rounded hover:bg-blue-600"
+                                      className="text-white text-xs bg-blue-500 p-1 rounded hover:bg-blue-600 shadow-sm"
                                     >
-                                      View
+                                      <FaEye className="w-3 h-3" />
                                     </button>
                                   </div>
                                 </div>
                               ) : (
-                                <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                                  <FaImage className="text-gray-400 w-8 h-8" />
+                                <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                  <FaImage className="text-gray-400 w-5 h-5" />
                                 </div>
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {game.categoryname || game.category?.name || 'N/A'}
-                            </div>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                              {game.categoryname || game.category?.name || 'Sports'}
+                            </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 font-medium">{game.name}</div>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
+                            {game.name}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
+                              {game.provider || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="text-sm text-gray-600 font-mono bg-gray-50 px-2 py-1 rounded border border-gray-200">
                               {game.gameId}
-                            </div>
+                            </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input 
                                 type="checkbox" 
@@ -589,29 +658,27 @@ const Menugames = () => {
                                 checked={game.status}
                                 onChange={() => toggleStatus(game._id, game.status)}
                               />
-                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                              <span className={`ml-3 text-sm font-medium ${game.status ? 'text-green-600' : 'text-red-600'}`}>
+                              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                              <span className={`ml-2 text-xs font-medium ${game.status ? 'text-green-600' : 'text-red-600'}`}>
                                 {game.status ? 'Active' : 'Inactive'}
                               </span>
                             </label>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
                               <button 
-                                className="px-3 py-2 text-white bg-blue-600 cursor-pointer rounded-md hover:bg-blue-700 transition-colors flex items-center"
+                                className="p-2 text-white bg-blue-600 cursor-pointer rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                                 onClick={() => editGame(game)}
-                                title="Edit"
+                                title="Edit game"
                               >
-                                <FaEdit className="mr-1" />
-                                <span className="hidden sm:inline">Edit</span>
+                                <FaEdit className="w-4 h-4" />
                               </button>
                               <button 
-                                className="px-3 py-2 text-white bg-red-600 cursor-pointer rounded-md hover:bg-red-700 transition-colors flex items-center"
+                                className="p-2 text-white bg-red-600 cursor-pointer rounded-lg hover:bg-red-700 transition-colors shadow-sm"
                                 onClick={() => confirmDelete(game)}
-                                title="Delete"
+                                title="Delete game"
                               >
-                                <FaTrash className="mr-1" />
-                                <span className="hidden sm:inline">Delete</span>
+                                <FaTrash className="w-4 h-4" />
                               </button>
                             </div>
                           </td>

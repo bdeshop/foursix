@@ -6,8 +6,7 @@ const menuGameSchema = new mongoose.Schema({
         required: true
     },
     category: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'GameCategory',
+        type:String,
         required: true
     },
     categoryname: {
@@ -24,6 +23,11 @@ const menuGameSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
+        trim: true
+    },
+    provider: {
+        type: String,
+        required: true,
         trim: true
     },
     status: {

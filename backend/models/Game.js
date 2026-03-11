@@ -34,6 +34,10 @@ const gameSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    defaultImage: {
+      type: String, // Store the default image URL from API
+      default: null,
+    },
     status: {
       type: Boolean,
       default: true,
@@ -42,8 +46,8 @@ const gameSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    fullScreen:{
- type: Boolean,
+    fullScreen: {
+      type: Boolean,
       default: false,
     },
     order: {

@@ -4,6 +4,7 @@ const gameProviderSchema = new mongoose.Schema(
   {
     name: { type: String, unique: false },
     providerOracleID: { type: String, unique: false },
+    providercode:{type: String,required:true},
     category: { type: String, required: true, trim: true },
     website: { type: String, trim: true },
     image: { type: String, required: true },
