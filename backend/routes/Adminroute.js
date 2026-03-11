@@ -2477,12 +2477,6 @@ Adminrouter.post(
   uploadGameProvider.single("image"),
   async (req, res) => {
     try {
-      if (!req.file) {
-        return res
-          .status(400)
-          .json({ error: "Please upload a provider image" });
-      }
-
       if (!req.body.name || !req.body.website || !req.body.providerOracleID) {
         return res.status(400).json({
           error: "Provider name, website and providerOracleID are required",
