@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import logo from "../../../assets/logo.png";
 import axios from "axios";
+
 // Create Auth Context
 const AuthContext = createContext();
 
@@ -49,6 +50,7 @@ const AuthProvider = ({ children }) => {
         setUser(data.data);
       } else {
         // Token is invalid, remove it
+        localStorage.removeItem("usertoken");
       }
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -58,13 +60,19 @@ const AuthProvider = ({ children }) => {
   };
 
   const login = (token, userData) => {
-    localStorage.setItem("token", token);
+    localStorage.setItem("usertoken", token);
     setUser(userData);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("usertoken");
+    setUser(null);
   };
 
   const value = {
     user,
     login,
+    logout,
     checkAuthStatus,
     loading,
   };
@@ -132,6 +140,7 @@ const FeaturedContent = () => {
         }
 
         const data = await response.json();
+        console.log(data)
         if (data.success) {
           setFeaturedGames(data.data);
         } else {
@@ -153,7 +162,7 @@ const FeaturedContent = () => {
   const scrollLeft = () => {
     if (sliderRef.current) {
       sliderRef.current.scrollBy({
-        left: -200, // Adjust scroll amount as needed
+        left: -200,
         behavior: "smooth",
       });
     }
@@ -163,7 +172,7 @@ const FeaturedContent = () => {
   const scrollRight = () => {
     if (sliderRef.current) {
       sliderRef.current.scrollBy({
-        left: 200, // Adjust scroll amount as needed
+        left: 200,
         behavior: "smooth",
       });
     }
@@ -186,11 +195,11 @@ const FeaturedContent = () => {
         } else {
           // Otherwise, scroll to the next image
           slider.scrollBy({
-            left: 200, // Must match the scrollRight value
+            left: 200,
             behavior: "smooth",
           });
         }
-      }, 3000); // Change image every 3 seconds
+      }, 3000);
     };
 
     // Pause the sliding on mouse hover
@@ -204,7 +213,6 @@ const FeaturedContent = () => {
     startSliding();
 
     return () => {
-      // Clean up event listeners and interval on component unmount
       clearInterval(slideInterval);
       slider.removeEventListener("mouseenter", pauseSliding);
       slider.removeEventListener("mouseleave", startSliding);
@@ -225,86 +233,83 @@ const FeaturedContent = () => {
     };
   }, []);
 
+  // Helper function to get the correct image URL
+  const getImageUrl = (game) => {
+    if (!game) return logo;
+    
+    // Check for different possible image fields
+    const imageField = game.portraitImage || game.image || game.coverImage;
+    
+    if (!imageField) return logo;
+    
+    // If it's already a full URL (default image from provider)
+    if (imageField.startsWith('http')) {
+      return imageField;
+    }
+    
+    // If it's a local path
+    if (imageField.startsWith('/')) {
+      return `${base_url}${imageField}`;
+    }
+    
+    // Otherwise, assume it's a relative path
+    return `${base_url}/${imageField}`;
+  };
+
   // Handle game click
-   const handleGameClick = (game) => {
+  const handleGameClick = (game) => {
     setSelectedGame(game);
-        console.log("gameee",game)
+    console.log("Game clicked:", game);
+    
     // Check if user is logged in
     if (!user) {
       setShowLoginPopup(true);
       return;
     }
     // If user is logged in, navigate directly to game
-    navigate(`/game/${game.gameApiID}`);
+    handleOpenGame(game);
   };
 
   // Handle opening the game
-  const handleOpenGame = async (game) => {
-    console.log("Attempting to open game:", game);
+// Handle opening the game
+const handleOpenGame = async (game) => {
+  console.log("Attempting to open game:", game);
 
-    // Check if user is logged in
-    if (!user) {
-      toast.error("Please login to play games");
-      setShowLoginPopup(true);
-      return;
+  // Check if user is logged in
+  if (!user) {
+    toast.error("Please login to play games");
+    setShowLoginPopup(true);
+    return;
+  }
+
+  try {
+    setGameLoading(true);
+
+    const gameId = game.gameId || game.gameApiID;
+
+    console.log("Game ID:", gameId);
+
+    const response = await fetch(`${base_url}/api/games/${gameId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch game with ID ${gameId}`);
     }
 
-    try {
-      setGameLoading(true);
-
-      const dataaa = game.gameId;
-
-      console.log("Game ID:", dataaa);
-
-      const response = await fetch(`${base_url}/api/games/${game.gameId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch game with ID ${game.gameId}`);
-      }
-
-      const gameData = await response.json();
-      if (!gameData.success) {
-        throw new Error(`Failed to fetch game with ID ${game.gameId}`);
-      }
-
-      console.log("Game data:", gameData?.data?.gameApiID);
-
-      // Step 1: Fetch game data from external API
-      const gameApiIDs = [gameData?.data?.gameApiID]; // Assuming game.gameId is the ID needed; adjust if multiple IDs
-      const externalApiResponse = await axios.post(
-        "https://apigames.oracleapi.net/api/games/by-ids",
-        { ids: gameApiIDs },
-        {
-          headers: {
-            "x-api-key":
-              "f7709c7bd13372f79d71906ee3071d26fdb4338987eb731d8182dd743e0bb5ce",
-          },
-        }
-      );
-
-      // Step 2: Check if external API response is valid
-      if (!externalApiResponse.data || externalApiResponse.data.length === 0) {
-        toast.error("Failed to fetch game data from external API");
-        return;
-      }
-
-      // Assuming externalApiResponse.data contains relevant game data
-      const externalGameData = externalApiResponse?.data?.data[0]; // Adjust based on actual response structure
-      console.log("External API game data:", externalGameData?.game_uuid);
-
-      if (!externalGameData?.game_uuid) {
-        toast.error("Failed to fetch game data from external API");
-        return;
-      }
-
-      navigate(`/game/${externalGameData.game_uuid}`);
-    } catch (err) {
-      console.error("Error:", err);
-      toast.error("Error connecting to game server");
-    } finally {
-      setGameLoading(false);
+    const gameData = await response.json();
+    if (!gameData.success) {
+      throw new Error(`Failed to fetch game with ID ${gameId}`);
     }
-  };
 
+    console.log("Game data:", gameData?.data?.gameApiID);
+
+    // Navigate with provider and category as query parameters
+    navigate(`/game/${gameData?.data?.gameApiID}?provider=${encodeURIComponent(game.provider)}&category=${encodeURIComponent(game.category)}`);
+  } catch (err) {
+    console.error("Error:", err);
+    toast.error("Error connecting to game server");
+  } finally {
+    setGameLoading(false);
+  }
+};
   // Handle login from popup
   const handleLoginFromPopup = () => {
     setShowLoginPopup(false);
@@ -385,8 +390,8 @@ const FeaturedContent = () => {
           }
           /* Hide scrollbar for IE, Edge and Firefox */
           .scrollbar-hide {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
           }
           
           /* Force consistent image size and aspect ratio */
@@ -394,8 +399,10 @@ const FeaturedContent = () => {
             position: relative;
             width: 100%;
             height: 0;
-            padding-bottom: 125%; /* 4:5 aspect ratio (200px width, 250px height) */
+            padding-bottom: 125%;
             overflow: hidden;
+            border-radius: 5px;
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
           }
           
           .featured-image {
@@ -404,11 +411,47 @@ const FeaturedContent = () => {
             left: 0;
             width: 100%;
             height: 100%;
-            border-radius:5px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+          }
+          
+          .group:hover .featured-image {
+            transform: scale(1.05);
+          }
+
+          /* Default image badge */
+          .default-image-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+          }
+
+          /* Play button styles */
+          .play-button {
+            background: var(--theme_color, #f97316);
+            padding: 12px;
+            border-radius: 50%;
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+          }
+
+          .group:hover .play-button {
+            transform: scale(1);
           }
         `}
       </style>
-      <div className="bg-[#1a1a1a] px-2 pt-6 md:p-4 font-inter text-gray-200">
+      
+      <div className="bg-[#1a1a1a]  pt-6 md:py-4 font-inter text-gray-200">
         <div className="flex justify-between items-center mb-2 md:mb-4">
           <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
             <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
@@ -420,7 +463,6 @@ const FeaturedContent = () => {
               className="p-2 bg-box_bg hover:bg-box_bg/90 cursor-pointer rounded-[3px] transition-colors duration-200"
               aria-label="Scroll left"
             >
-              {/* Using inline SVG for the left arrow */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -431,7 +473,6 @@ const FeaturedContent = () => {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="lucide lucide-chevron-left"
               >
                 <path d="m15 18-6-6 6-6" />
               </svg>
@@ -441,7 +482,6 @@ const FeaturedContent = () => {
               className="p-2 bg-box_bg hover:bg-box_bg/90 cursor-pointer rounded-[3px] transition-colors duration-200"
               aria-label="Scroll right"
             >
-              {/* Using inline SVG for the right arrow */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -452,35 +492,66 @@ const FeaturedContent = () => {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="lucide lucide-chevron-right"
               >
                 <path d="m9 18 6-6-6-6" />
               </svg>
             </button>
           </div>
         </div>
+        
         <div
           ref={sliderRef}
-          className="flex overflow-x-auto py-2 scrollbar-hide snap-x snap-mandatory"
+          className="flex overflow-x-auto py-2 scrollbar-hide snap-x snap-mandatory gap-2"
         >
-          {featuredGames.map((game, index) => (
-            <div
-              key={game._id || index}
-              className="flex-shrink-0 w-[130px] md:w-[175px] flex flex-col items-center justify-center p-1 snap-center transform transition-transform duration-200 hover:scale-105 cursor-pointer relative group"
-              onClick={() => handleGameClick(game)}
-            >
-              <div className="featured-image-container">
-                <img
-                  src={`${base_url}/${
-                  game.portraitImage
-                  }`}
-                  alt={game.name}
-                  className="featured-image"
-                />
+          {featuredGames.map((game, index) => {
+            const imageUrl = getImageUrl(game);
+            const isDefaultImage = game.portraitImage?.startsWith('http') || game.image?.startsWith('http');
+            
+            return (
+              <div
+                key={game._id || index}
+                className="flex-shrink-0 w-[130px] md:w-[175px] flex flex-col items-center justify-center p-1 snap-center transform transition-transform duration-200 hover:scale-105 cursor-pointer relative group"
+                onClick={() => handleGameClick(game)}
+              >
+                <div className="featured-image-container">
+                  <img
+                    src={imageUrl}
+                    alt={game.name}
+                    className="featured-image"
+                    loading="lazy"
+                  />
 
+                  {/* Play Button */}
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center bg-[rgba(0,0,0,0.3)] transition-opacity duration-300 ${
+                      isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  >
+                    <div className="play-button">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="white"
+                        stroke="white"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Game Name (Optional - can be uncommented if needed) */}
+                {/* <p className="mt-2 text-xs text-center text-gray-400 truncate w-full">
+                  {game.name}
+                </p> */}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -515,9 +586,12 @@ const FeaturedContent = () => {
             {/* Logo */}
             <div className="flex justify-center mb-6">
               <img 
-                className="w-[100px]" 
+                className="w-[100px] object-contain" 
                 src={dynamicLogo} 
                 alt=""
+                onError={(e) => {
+                  e.target.src = logo;
+                }}
               />
             </div>
 
@@ -531,7 +605,7 @@ const FeaturedContent = () => {
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleRegisterFromPopup}
-                className="bg-theme_color text-center hover:bg-theme_color/90 text-[14px] text-white font-medium py-3 px-4  transition-colors"
+                className="bg-theme_color text-center hover:bg-theme_color/90 text-[14px] text-white font-medium py-3 px-4 transition-colors"
               >
                 Sign up
               </button>
@@ -564,22 +638,6 @@ const FeaturedContent = () => {
               {/* Spinning ring around logo */}
               <div className="absolute -inset-4 border-4 border-theme_color border-t-transparent rounded-full animate-spin"></div>
             </div>
-
-            {/* Loading text with animation
-      <p className="text-white text-xl font-semibold mb-6 flex items-center">
-        Loading game
-        <span className="animate-bounce delay-100">.</span>
-        <span className="animate-bounce delay-200">.</span>
-        <span className="animate-bounce delay-300">.</span>
-      </p> */}
-
-            {/* Animated progress bar */}
-            {/* <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-theme_color to-yellow-500 animate-[progressBar_2s_ease-in-out_infinite]"></div>
-      </div>
-       */}
-            {/* Optional tip or message */}
-            {/* <p className="text-gray-400 text-sm mt-6">Preparing your gaming experience...</p> */}
           </div>
         </div>
       )}

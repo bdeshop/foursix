@@ -56,7 +56,6 @@ router.get("/providers/:category", async (req, res) => {
       status: true 
     })
     .sort({ order: 1, createdAt: -1 })
-    .select("name image website order");
     
     res.json({
       success: true,
@@ -76,7 +75,6 @@ router.get("/providers", async (req, res) => {
   try {
     const providers = await GameProvider.find({ status: true })
       .sort({ order: 1, createdAt: -1 })
-      .select("name image website category order");
     
     res.json({
       success: true,

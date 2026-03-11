@@ -82,6 +82,22 @@ let categoriesCache = null;
 let brandingCache = null;
 
 // Skeleton Loading Components
+const SkeletonItem = ({ type }) => {
+  if (type === "category") {
+    return (
+      <div className="flex flex-col relative items-center justify-center p-3 rounded-[5px] bg-[#222424] animate-pulse h-[80px] w-full">
+        <div className="w-[45px] h-[45px] absolute top-[-30%] rounded-full bg-[#333] border-2 border-[#1a1a1a]"></div>
+        <div className="h-3 w-16 bg-[#333] mt-4 rounded"></div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center rounded-[8px] overflow-hidden animate-pulse w-full">
+      <div className="w-full aspect-[3/4] bg-[#222424] rounded-[6px]"></div>
+    </div>
+  );
+};
+
 const CategorySkeleton = ({ isMobile }) => {
   if (isMobile) {
     return (
@@ -90,10 +106,9 @@ const CategorySkeleton = ({ isMobile }) => {
           {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
-              className="flex-shrink-0 w-[calc(25.333%-0.5rem)] min-w-0 flex flex-col relative items-center justify-center p-3 rounded-[5px] bg-box_bg"
+              className="flex-shrink-0 w-[calc(25.333%-0.5rem)] min-w-0"
             >
-              <div className="w-[45px] h-[45px] absolute top-[-30%] rounded-full bg-gray-700 animate-pulse"></div>
-              <div className="w-16 h-4 mt-4 bg-gray-700 rounded animate-pulse"></div>
+              <SkeletonItem type="category" />
             </div>
           ))}
         </div>
@@ -104,13 +119,7 @@ const CategorySkeleton = ({ isMobile }) => {
   return (
     <div className="hidden lg:grid grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4 p-4 pt-[40px]">
       {Array.from({ length: 9 }).map((_, index) => (
-        <div
-          key={index}
-          className="flex flex-col relative items-center justify-center p-3 rounded-[5px] bg-box_bg"
-        >
-          <div className="w-[45px] h-[45px] absolute top-[-30%] rounded-full bg-gray-700 animate-pulse"></div>
-          <div className="w-16 h-4 mt-4 bg-gray-700 rounded animate-pulse"></div>
-        </div>
+        <SkeletonItem key={index} type="category" />
       ))}
     </div>
   );
@@ -124,7 +133,7 @@ const ContentSkeleton = ({ isSportsCategory }) => {
           {Array.from({ length: 14 }).map((_, index) => (
             <div
               key={index}
-              className="flex flex-col items-center bg-[#2A3254] rounded-[3px] p-[10px] "
+              className="flex flex-col items-center bg-[#2A3254] rounded-[3px] p-[10px]"
             >
               <div className="w-[100px] h-[133px] bg-gray-700 rounded animate-pulse"></div>
               <div className="pt-2 w-full">
@@ -161,7 +170,7 @@ const CategoryContent = () => {
 
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
-  const [menuGames, setMenuGames] = useState([]); // Changed from exclusiveGames to menuGames
+  const [menuGames, setMenuGames] = useState([]);
   const [displayedGames, setDisplayedGames] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -245,10 +254,8 @@ const CategoryContent = () => {
 
     if (sportsCategory) {
       setActiveCategory(sportsCategory);
-      setContentLoading(true);
       // Always fetch menu games for the Sports tab
       await fetchMenuGames();
-      setContentLoading(false);
     }
   };
 
@@ -277,14 +284,28 @@ const CategoryContent = () => {
   // Update displayed games when menu games change
   useEffect(() => {
     if (menuGames.length > 0) {
-      const initialGames = menuGames.slice(0, 20);
+      const gamesPerPage = calculateGamesPerPage();
+      const initialGames = menuGames.slice(0, gamesPerPage);
       setDisplayedGames(initialGames);
-      setHasMoreGames(menuGames.length > 20);
+      setGamesPage(1);
+      setHasMoreGames(menuGames.length > gamesPerPage);
     } else {
       setDisplayedGames([]);
       setHasMoreGames(false);
+      setGamesPage(1);
     }
-  }, [menuGames]);
+  }, [menuGames, isMobile]);
+
+  // Calculate games per page based on screen size
+  const calculateGamesPerPage = () => {
+    if (isMobile) {
+      // Mobile: 4 columns × 3 rows = 12 games initially
+      return 12;
+    } else {
+      // Desktop: Start with 14 games
+      return 14;
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -321,25 +342,38 @@ const CategoryContent = () => {
   };
 
   const fetchMenuGames = async () => {
+    setContentLoading(true);
     try {
       const response = await axios.get(`${base_url}/api/menu-games`);
-      if (response.data && response.data.length > 0) {
-        // Filter only sports games if needed, or show all menu games
-        const sportsGames = response.data.filter(game => 
-          game.category && game.category.name.toLowerCase() === "sports"
-        );
-        
-        // Use sports games if available, otherwise use all menu games
-        const gamesToDisplay = sportsGames.length > 0 ? sportsGames : response.data;
-        setMenuGames(gamesToDisplay);
-        setProviders([]); // Clear providers when showing menu games
-        setGamesPage(1);
-      } else {
-        setMenuGames([]);
+      
+      let gamesData = [];
+      
+      if (response.data && response.data.data) {
+        gamesData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        gamesData = response.data;
       }
+      
+      // Filter only sports games
+      const sportsGames = gamesData.filter(game => {
+        if (!game) return false;
+        
+        const categoryName = (game.categoryname || game.category || game.categoryName || '').toLowerCase();
+        const gameName = (game.name || game.gameName || '').toLowerCase();
+        
+        // Check for sports category or sports in game name
+        return categoryName.includes("sports") || gameName.includes("sports");
+      });
+      
+      // Use sports games if available, otherwise use all menu games
+      const gamesToDisplay = sportsGames.length > 0 ? sportsGames : gamesData;
+      setMenuGames(gamesToDisplay);
+      setProviders([]);
     } catch (error) {
       console.error("Error fetching menu games:", error);
       setMenuGames([]);
+    } finally {
+      setContentLoading(false);
     }
   };
 
@@ -348,7 +382,6 @@ const CategoryContent = () => {
     if (activeCategory?._id === category._id) return;
     
     setActiveCategory(category);
-    setContentLoading(true);
     
     // Check if this is the Sports category (case insensitive)
     if (category.name.toLowerCase() === "sports") {
@@ -356,13 +389,12 @@ const CategoryContent = () => {
     } else {
       await fetchProviders(category.name);
     }
-    setContentLoading(false);
   };
 
   const handleProviderClick = (provider) => {
     if (activeCategory) {
       navigate(
-        `/games?category=${activeCategory.name.toLowerCase()}&provider=${provider.name.toLowerCase()}`
+        `/games?category=${activeCategory.name.toLowerCase()}&provider=${provider.providercode}`
       );
     }
   };
@@ -370,14 +402,20 @@ const CategoryContent = () => {
   // Handle game click - Direct navigation to game page
   const handleGameClick = (game) => {
     setSelectedGame(game);
- console.log(game)
+    console.log("Selected game:", game);
+    
     // Check if user is logged in
     if (!user) {
       setShowLoginPopup(true);
       return;
     }
+    
     // If user is logged in, navigate directly to game
-    navigate(`/game/${game.gameId}`);
+    if (game.gameApiID || game.gameId) {
+      navigate(`/game/${game.gameApiID || game.gameId}?provider=${game.provider}&category=${game.categoryname}`);
+    } else {
+      toast.error("Game ID not found");
+    }
   };
 
   // Handle opening the game
@@ -395,7 +433,12 @@ const CategoryContent = () => {
       setGameLoading(true);
       
       // Direct navigation to game page
-      navigate(`/game/${game.gameApiID}`);
+      const gameId = game.gameApiID || game.gameId;
+      if (gameId) {
+        navigate(`/game/${gameId}`);
+      } else {
+        toast.error("Game ID not found");
+      }
       
     } catch (err) {
       console.error("Error:", err);
@@ -419,7 +462,8 @@ const CategoryContent = () => {
 
   const handleShowMore = () => {
     const nextPage = gamesPage + 1;
-    const nextGames = menuGames.slice(0, 20 * nextPage);
+    const gamesPerLoad = calculateGamesPerPage();
+    const nextGames = menuGames.slice(0, gamesPerLoad * nextPage);
     setDisplayedGames(nextGames);
     setGamesPage(nextPage);
     setHasMoreGames(menuGames.length > nextGames.length);
@@ -447,14 +491,34 @@ const CategoryContent = () => {
     };
   }, [showLoginPopup]);
 
+  // Get game image URL
+  const getGameImageUrl = (game) => {
+    if (!game) return '';
+    
+    const imagePath = game.portraitImage || game.image || game.thumbnail || '';
+    if (!imagePath) return '';
+    
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Remove leading slash if present to avoid double slash
+    const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return `${base_url}/${cleanPath}`;
+  };
+
   // Render provider grid based on the number of providers
   const renderProviderGrid = () => {
     // Show skeleton loading for content
     if (contentLoading) {
       return (
-        <ContentSkeleton 
-          isSportsCategory={activeCategory?.name.toLowerCase() === "sports"}
-        />
+        <div className="py-4">
+          <div className="grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+            {[...Array(calculateGamesPerPage())].map((_, i) => (
+              <SkeletonItem key={i} type="game" />
+            ))}
+          </div>
+        </div>
       );
     }
 
@@ -472,34 +536,45 @@ const CategoryContent = () => {
     if (isSportsCategory) {
       // Render menu games in a responsive grid
       return (
-        <div className="px-2 md:p-4">
-          <div className="grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
+        <div className="py-4">
+          <div className="grid grid-cols-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3">
             {displayedGames.map((game) => (
               <div
-                key={game._id}
-                className="flex flex-col items-center md:flex-row bg-[#2A3254] rounded-[8px] border-[1px] border-gray-700 px-[10px] py-3 overflow-hidden transition-all cursor-pointer relative group"
+                key={game._id || game.gameId}
+                className="flex flex-col items-center rounded-[8px] overflow-hidden transition-all cursor-pointer hover:border-theme_color hover:shadow-lg group"
                 onClick={() => handleGameClick(game)}
               >
+                {/* Game Image Container with fixed aspect ratio */}
+                <div className="game-image-container w-full mb-2">
                   <img
-                    src={`${base_url}/${game.portraitImage || game.image || ''}`}
-                    alt={game.name}
-                    className="w-[50px] h-[50px] transition-transform duration-300 group-hover:scale-105"
+                    src={getGameImageUrl(game)}
+                    alt={game.name || game.gameName}
+                    className="game-image rounded-[6px] transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                      e.target.src = logo; // Fallback image on error
+                    }}
                   />
-                <div className="pt-2 w-full">
-                  <p className="text-white text-[12px] uppercase text-center truncate">{game.name}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          {hasMoreGames && (
-            <div className="flex justify-center mt-4">
+          {/* More Button - Only show if there are more games to load */}
+          {hasMoreGames && displayedGames.length > 0 && (
+            <div className="flex justify-center mt-8 mb-4">
               <button
-                className="px-6 py-2 bg-theme_color cursor-pointer text-white text-sm rounded"
+                className="px-8 py-3 bg-theme_color hover:bg-theme_color/90 text-white text-sm font-medium transition-all duration-300 hover:shadow-lg hover:shadow-theme_color/30"
                 onClick={handleShowMore}
               >
-                More
+                More Games
               </button>
+            </div>
+          )}
+
+          {/* Show message if no games found */}
+          {displayedGames.length === 0 && menuGames.length === 0 && (
+            <div className="text-center py-8 text-gray-400">
+              No sports games found.
             </div>
           )}
         </div>
@@ -508,7 +583,7 @@ const CategoryContent = () => {
 
     // Render providers grid for non-sports categories
     return (
-      <div className="px-2 md:p-4">
+      <div className="py-[10px]">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3">
           {providers.map((provider) => (
             <div
@@ -520,8 +595,13 @@ const CategoryContent = () => {
                 src={`${base_url}/${provider.image}`}
                 alt={provider.name}
                 className="w-[30px]"
+                onError={(e) => {
+                  e.target.src = logo; // Fallback image on error
+                }}
               />
-              <span className="text-sm text-gray-400">{provider.name}</span>
+              <span className="text-sm text-gray-400 truncate max-w-[80px]">
+                {provider.name}
+              </span>
             </div>
           ))}
         </div>
@@ -533,13 +613,14 @@ const CategoryContent = () => {
     <>
       <style>
         {`
-          /* Force consistent image size and aspect ratio */
+          /* Force consistent image size and aspect ratio - Portrait 3:4 */
           .game-image-container {
             position: relative;
             width: 100%;
             height: 0;
-            padding-bottom: 133.33%; /* 3:4 aspect ratio */
+            padding-bottom: 133.33%; /* 3:4 aspect ratio (portrait) */
             overflow: hidden;
+            border-radius: 6px;
           }
           
           .game-image {
@@ -551,18 +632,21 @@ const CategoryContent = () => {
             object-fit: cover;
           }
 
-          /* Smooth skeleton animation */
-          @keyframes pulse {
-            0%, 100% {
-              opacity: 1;
-            }
-            50% {
-              opacity: 0.5;
-            }
+          /* Custom scrollbar hide for mobile */
+          .hidescrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hidescrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
           }
 
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
           .animate-pulse {
-            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
           }
         `}
       </style>
@@ -573,7 +657,7 @@ const CategoryContent = () => {
       ) : (
         <>
           {/* Mobile slider for categories using Embla Carousel */}
-          <div className="block lg:hidden px-2 py-4 md:p-4 pt-[40px] relative hidescrollbar">
+          <div className="block lg:hidden py-4 md:p-4 pt-[30px] md:pt-[40px] relative hidescrollbar">
             <div className="embla" ref={emblaRef}>
               <div className="embla__container flex gap-3">
                 {categories.map((category) => (
@@ -590,6 +674,9 @@ const CategoryContent = () => {
                       src={`${base_url}/${category.image}`}
                       alt={category.name}
                       className="w-[45px] absolute top-[-30%] rounded-full transition-transform duration-300 ease-in-out group-hover:rotate-[360deg]"
+                      onError={(e) => {
+                        e.target.src = logo; // Fallback image on error
+                      }}
                     />
                     
                     <span
@@ -608,7 +695,7 @@ const CategoryContent = () => {
           </div>
 
           {/* Desktop grid for categories */}
-          <div className="hidden lg:grid grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4 p-4 pt-[40px]">
+          <div className="hidden lg:grid grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4 pt-[40px]">
             {categories.map((category) => (
               <div
                 key={category._id}
@@ -623,6 +710,9 @@ const CategoryContent = () => {
                   src={`${base_url}/${category.image}`}
                   alt={category.name}
                   className="w-[45px] absolute top-[-30%] rounded-full transition-transform duration-300 ease-in-out group-hover:rotate-[360deg]"
+                  onError={(e) => {
+                    e.target.src = logo; // Fallback image on error
+                  }}
                 />
                 <span
                   className={`text-sm mt-4 font-[500] ${

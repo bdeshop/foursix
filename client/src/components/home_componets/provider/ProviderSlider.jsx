@@ -48,7 +48,6 @@ const ProviderSlider = () => {
       }
       
       const data = await response.json();
-      
       if (data.success) {
         setProviders(data.data);
       } else {
@@ -120,7 +119,7 @@ const ProviderSlider = () => {
 
   // Function to truncate provider name
   const truncateName = (name, maxLength = 20) => {
-    if (name.length > maxLength) {
+    if (name?.length > maxLength) {
       return name.substring(0, maxLength - 3) + '...';
     }
     return name;
@@ -129,7 +128,7 @@ const ProviderSlider = () => {
   // Handle provider click - navigate to all-games with provider query
   const handleProviderClick = (provider) => {
     // Encode the provider name for URL
-    const encodedProviderName = encodeURIComponent(provider.name.toLowerCase());
+    const encodedProviderName = encodeURIComponent(provider.providercode);
     
     // Navigate to all-games page with provider query parameter
     navigate(`/all-games?provider=${encodedProviderName}`);
@@ -193,7 +192,7 @@ const ProviderSlider = () => {
           }
         `}
       </style>
-      <div className="bg-[#1a1a1a] px-2 md:p-4 pt-7 font-inter text-gray-200">
+      <div className="bg-[#1a1a1a]  pt-7 font-inter text-gray-200">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
             <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
@@ -228,16 +227,16 @@ const ProviderSlider = () => {
             providers.map((provider, index) => (
               <div
                 key={index}
-                className="provider-card flex-shrink-0 md:w-40  bg-box_bg flex rounded-[3px] items-center justify-between gap-4 p-2 snap-center transform transition-transform duration-200 hover:scale-105 cursor-pointer"
+                className="provider-card flex-shrink-0 md:w-40  bg-box_bg flex rounded-[3px] items-center justify-start gap-4 p-2 py-2.5 snap-center transform transition-transform duration-200 hover:scale-105 cursor-pointer"
                 onClick={() => handleProviderClick(provider)}
                 title={`View ${provider.name} games`}
               >
                 <img
                   src={`${base_url}/${provider.image}`}
                   alt={provider.name}
-                  className="w-10 md:w-[40px] object-contain"
+        className="w-[30px]"
                 />
-                <span className="mt-2 pr-2 text-sm text-center text-gray-400 font-[600] truncate-text">
+                <span className=" pr-2 text-sm text-center text-gray-400 font-[600] truncate-text">
                   {truncateName(provider.name)}
                 </span>
               </div>
