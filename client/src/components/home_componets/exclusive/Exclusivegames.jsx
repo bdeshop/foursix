@@ -252,7 +252,7 @@ const Exclusivegames = () => {
       </style>
 
       {/* Header Title */}
-      <div className="px-4 pt-8">
+      <div className=" pt-8">
             <h2 className="text-[16px] md:text-lg font-semibold flex items-center">
             <span className="w-1 h-6 bg-theme_color mr-2 rounded-full"></span>
         Exclusive Games
