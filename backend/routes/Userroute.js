@@ -1194,36 +1194,28 @@ Userrouter.get("/all-transactions", authenticateToken, async (req, res) => {
 }); 
 
 // ?  get the game  old code
+
+// ?  get the game  old code
 Userrouter.post("/getGameLink", async (req, res) => {
     try {
-      const { username, money, gameID } = req.body;
+      const { username, money, gameID, provider, category } = req.body;
 
       console.log("this is body ", req.body);
 
-      
-    // this is for 1xwin
-      const postData = {
-        home_url: "https://foursix.live",
-        token: "93e9914776c1ff40d705203da452d35f",
-        username: username + "45",
-        money: money,
-        gameid: req.body.gameID,
-      };
-
-      console.log("this is log ");
-
-      console.log("Sending POST request to joyhobe.com with data:", postData);
-
       // POST রিকোয়েস্ট
-      const response = await axios.post(
-        // "https://dstplay.net/getgameurl",
-        "https://crazybet99.com/getgameurl",
-        qs.stringify(postData),
+      const response = await axios.post('https://crazybet99.com/getgameurl/v2', 
+        {
+          username: username+"45",
+          money: money,
+          game_code: gameID,
+          provider_code: provider,  // Add provider from request body
+          game_type: category,      // Add category from request body
+        },
         {
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "x-dstgame-key": postData.token,
-          },
+            'Content-Type': 'application/json',
+            'x-dstgame-key': '93e9914776c1ff40d705203da452d35f'
+          }
         }
       );
 
@@ -1233,6 +1225,7 @@ Userrouter.post("/getGameLink", async (req, res) => {
         "Status:",
         response.status
       );
+      
       res.status(200).json({
         message: "POST request successful",
         joyhobeResponse: response.data,
@@ -1242,9 +1235,9 @@ Userrouter.post("/getGameLink", async (req, res) => {
       res.status(500).json({
         error: "Failed to forward POST request",
         details: error.message,
-      });
-    }
-  });
+      });
+    }
+});
 // Route to handle game callback data
 
 // Userrouter.post("/callback-data-game", async (req, res) => {
