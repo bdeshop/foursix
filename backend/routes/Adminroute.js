@@ -2477,9 +2477,16 @@ Adminrouter.post(
   uploadGameProvider.single("image"),
   async (req, res) => {
     try {
-      if (!req.body.name || !req.body.website || !req.body.providerOracleID) {
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ error: "Please upload a provider image" });
+      }
+
+      // Validate required fields including providercode
+      if (!req.body.name || !req.body.website || !req.body.providerOracleID || !req.body.providercode) {
         return res.status(400).json({
-          error: "Provider name, website and providerOracleID are required",
+          error: "Provider name, website, providerOracleID and providercode are required",
         });
       }
 
@@ -2487,9 +2494,11 @@ Adminrouter.post(
         name: req.body.name,
         website: req.body.website,
         providerOracleID: req.body.providerOracleID,
+        providercode: req.body.providercode, // Added providercode
         image: `/uploads/game-providers/${req.file.filename}`,
         status: req.body.status === "true" || req.body.status === true,
         category: req.body.category,
+        order: req.body.order || 0, // Added order field support
       };
 
       const newProvider = new GameProvider(providerData);
@@ -2501,6 +2510,10 @@ Adminrouter.post(
       });
     } catch (error) {
       if (error.code === 11000) {
+        // Check which field caused the duplicate error
+        if (error.keyPattern?.providercode) {
+          return res.status(400).json({ error: "Provider code already exists" });
+        }
         return res.status(400).json({ error: "Provider name already exists" });
       }
       res.status(500).json({ error: "Failed to create game provider" });
