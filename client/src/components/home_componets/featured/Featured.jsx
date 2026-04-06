@@ -133,7 +133,7 @@ const FeaturedContent = () => {
     const fetchFeaturedGames = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${base_url}/api/games/featured/featured`);
+        const response = await fetch(`${base_url}/api/games/featured/all`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

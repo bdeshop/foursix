@@ -754,7 +754,28 @@ router.get("/banners/computer", async (req, res) => {
     });
   }
 });
-
+router.get("/games/featured/all", async (req, res) => {
+  try {
+    const games = await Game.find({ 
+      featured: true,
+      status: true 
+    })
+    .sort({ order: 1 })
+    .select("name gameId gameApiID provider category portraitImage landscapeImage defaultImage order");
+    
+    res.json({
+      success: true,
+      data: games,
+      count: games.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching featured games",
+      error: error.message
+    });
+  }
+});
 router.get("/exclusive-games", async (req, res) => {
   try {
     const exclusive_games=await Game.find({category:"exclusive",status:true});
