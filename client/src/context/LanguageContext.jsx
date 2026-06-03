@@ -481,7 +481,7 @@ vipClub: 'ভিআইপি ক্লাব',
       'অনলাইন বেটিং মূলধারার বিনোদনে পরিণত হওয়ার সাথে সাথে, খেলোয়াড়রা বিশ্বাসযোগ্য ও বৈচিত্র্যময় প্ল্যাটফর্ম খুঁজছেন। FourSix  শ্রেষ্ঠত্ব, নিরাপত্তা এবং অতুলনীয় গেমিং অভিজ্ঞতার জন্য খ্যাতি অর্জন করেছে।',
     footerCopyright: '© ২০২৬ FourSix  কপিরাইট। সর্বস্বত্ব সংরক্ষিত',
     footerLegalText:
-      'FourSix  BAJI Holdings Limited-এর মালিকানাধীন ও পরিচালিত, নিবন্ধন নম্বর ১৫৮৩৯, নিবন্ধিত ঠিকানা: হামশাহাকা, মুতাসাম্মুদু, কমোরোস ইউনিয়নের আনজোয়ান স্বায়ত্তশাসিত দ্বীপ। আমাদের সাথে যোগাযোগ করুন - FourSix  কমোরোস ইউনিয়নের আনজোয়ান স্বায়ত্তশাসিত দ্বীপের সরকার কর্তৃক লাইসেন্সপ্রাপ্ত ও নিয়ন্ত্রিত এবং লাইসেন্স নং ALSB-202410030-FJL-এর অধীনে পরিচালিত হয়। FourSix  সমস্ত নিয়ন্ত্রক সম্মতি পাস করেছে।',
+      'FourSix,  FourSix Holdings Limited-এর মালিকানাধীন ও পরিচালিত, নিবন্ধন নম্বর ১৫৮৩৯, নিবন্ধিত ঠিকানা: হামশাহাকা, মুতাসাম্মুদু, কমোরোস ইউনিয়নের আনজোয়ান স্বায়ত্তশাসিত দ্বীপ। আমাদের সাথে যোগাযোগ করুন - FourSix  কমোরোস ইউনিয়নের আনজোয়ান স্বায়ত্তশাসিত দ্বীপের সরকার কর্তৃক লাইসেন্সপ্রাপ্ত ও নিয়ন্ত্রিত এবং লাইসেন্স নং ALSB-202410030-FJL-এর অধীনে পরিচালিত হয়। FourSix  সমস্ত নিয়ন্ত্রক সম্মতি পাস করেছে।',
   },
 
   en: {
@@ -963,7 +963,7 @@ vipClub: 'VIP Club',
       'With online betting becoming a mainstream entertainment choice, players are looking for a platform that offer both trust and variety. Among the most established names in the industry, FourSix has built a reputation for excellence, security, and an unparalleled gaming experience.',
     footerCopyright: '© 2026 FourSix Copyrights. All rights Reserved',
     footerLegalText:
-      'FourSix owned and operated by BAJI Holdings Limited, registration number 15839, registered address: Hamshahaka, Mutasammudu, Autonomous Island of Anjouan, Union of Comoros. Contact us is licensed and regulated by the Government of the Autonomous Island of Anjouan, Union of Comoros and operates under License No. ALSB-202410030-FJL. FourSix has passed all regulatory compliance and is legally authorized to conduct gaming operations for any and all games of chance and wagering.',
+      'FourSix owned and operated by FourSix Holdings Limited, registration number 15839, registered address: Hamshahaka, Mutasammudu, Autonomous Island of Anjouan, Union of Comoros. Contact us is licensed and regulated by the Government of the Autonomous Island of Anjouan, Union of Comoros and operates under License No. ALSB-202410030-FJL. FourSix has passed all regulatory compliance and is legally authorized to conduct gaming operations for any and all games of chance and wagering.',
   },
 };
 

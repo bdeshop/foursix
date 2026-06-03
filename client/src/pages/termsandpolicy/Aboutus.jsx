@@ -130,7 +130,7 @@ const Aboutus = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start gap-8">
           
           <div className="flex flex-col items-start min-w-[150px]">
-            <img src={logo} alt="Baji" className="w-20 mb-2" />
+            <img src={logo} alt="FourSix" className="w-20 mb-2" />
             <p className="text-[10px] text-gray-500">©Copyright 2021-24</p>
           </div>
 
