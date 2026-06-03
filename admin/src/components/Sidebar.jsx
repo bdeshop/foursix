@@ -4,7 +4,7 @@ import {
   FiChevronRight, FiHome, FiUsers, FiSettings, FiBell, FiActivity, FiTrendingUp, 
   FiBarChart2, FiLayers, FiCreditCard, FiCalendar, FiBox, FiMessageSquare, 
   FiLogIn, FiFileText, FiShare2, FiGift, FiUserPlus, FiDollarSign, FiCheckCircle, FiXCircle,
-  FiShield, FiUserCheck,FiAward
+  FiShield, FiUserCheck, FiAward
 } from 'react-icons/fi';
 import { RiCoinsLine, RiRefund2Line } from 'react-icons/ri';
 import { useNavigate } from "react-router-dom";
@@ -46,7 +46,7 @@ const Sidebar = ({ isOpen }) => {
             'Authorization': `Bearer ${token}`
           }
         });
-        
+        console.log('Admin permissions response:', response.data); // Debug log
         if (response.data.success) {
           // response.data.permissions is an array of permission strings
           setAdminPermissions(response.data.permissions || []);
@@ -152,8 +152,13 @@ const Sidebar = ({ isOpen }) => {
   );
 
   // Check if user has permission - since permissions is an array of strings
+  // IMPORTANT: If role is 'admin' and permissions array is empty, show ALL menus
   const hasPermission = (permissionString) => {
-    // If no permissions array or empty, deny access
+    // SUPER ADMIN RULE: If role is 'admin' and permissions array is empty, grant all permissions
+    if (adminRole === 'admin' && (!adminPermissions || adminPermissions.length === 0)) {
+      return true;
+    }
+    // If no permissions array or empty, deny access (unless super admin as above)
     if (!adminPermissions || adminPermissions.length === 0) return false;
     // Check if the permission string exists in the array
     return adminPermissions.includes(permissionString);
@@ -215,7 +220,7 @@ const Sidebar = ({ isOpen }) => {
   return (
     <aside ref={sidebarRef} className={`transition-all no-scrollbar duration-300 overflow-y-auto fixed w-[70%] md:w-[40%] lg:w-[28%] xl:w-[17%] h-full z-[999] border-r border-gray-800 text-sm shadow-2xl pt-[12vh] p-4 ${isOpen ? 'left-0 top-0' : 'left-[-120%] top-0'} bg-[#161B22] text-white`}>
       
-      {/* Dashboard - Always visible (requires view_dashboard permission) */}
+      {/* Dashboard - Always visible for admin (requires view_dashboard permission OR super admin) */}
       {hasPermission('view_dashboard') && (
         <div className="mb-3">
           <NavLink 
@@ -289,7 +294,7 @@ const Sidebar = ({ isOpen }) => {
             { to: '/deposit-bonus/all-bonuses', text: 'All Bonuses', requiredPermission: 'manage_promotional_content' },
           ],
         },
-            {
+        {
           label: 'Bonuses', icon: <FiAward />, key: 'bonuses',
           requiredPermission: 'manage_bonuses',
           links: [
@@ -298,7 +303,6 @@ const Sidebar = ({ isOpen }) => {
             { to: '/bonuses/weekly-monthly-bonus', text: 'Weekly and Monthly Bonus', requiredPermission: 'manage_recurring_bonuses' },
           ],
         },
-        
         {
           label: 'Payment Method', icon: <FiCreditCard />, key: 'method',
           requiredPermission: 'view_deposit_methods',
