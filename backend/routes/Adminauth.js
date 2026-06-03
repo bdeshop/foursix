@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 Adminauth.post("/signup", async (req, res) => {
   try {
     const {name, email, password } = req.body;
-
+    console.log("Signup request received:", { name, email });
     // Check if admin already exists
     const existingAdmin = await Admin.findOne({ email });
     if (existingAdmin) {
