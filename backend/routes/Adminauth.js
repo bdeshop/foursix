@@ -6,7 +6,7 @@ const bcrypt = require("bcryptjs");
 // Signup route
 Adminauth.post("/signup", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const {name, email, password } = req.body;
 
     // Check if admin already exists
     const existingAdmin = await Admin.findOne({ email });
@@ -15,7 +15,7 @@ Adminauth.post("/signup", async (req, res) => {
     }
 
     // Create new admin
-    const admin = new Admin({ email, password });
+    const admin = new Admin({ name, email, password });
     await admin.save();
 
     // Generate JWT token
