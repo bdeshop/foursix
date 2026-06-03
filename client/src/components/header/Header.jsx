@@ -770,30 +770,19 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
       subItems: [],
       path: "/coming-soon?title=Brand Ambassadors"
     },
-    {
-      title: t.appDownload,
-      icon: <FaMobileAlt className="w-5 h-5 min-w-[20px]" />,
-      subItems: [],
-      onClick: () => downloadFileAtURL(APK_FILE),
-    },
-    {
-      title: t.contactUs,
-      icon: <FaPhone className="w-5 h-5 min-w-[20px]" />,
-      subItems: [],
-      isContact: true
-    },
+    // {
+    //   title: t.contactUs,
+    //   icon: <FaPhone className="w-5 h-5 min-w-[20px]" />,
+    //   subItems: [],
+    //   isContact: true
+    // },
     {
       title: t.newMemberGuide,
       icon: <FaBook className="w-5 h-5 min-w-[20px]" />,
       subItems: [],
       path: "/coming-soon?title=New Member Guide"
     },
-    {
-      title: t.bjForum,
-      icon: <FaComments className="w-5 h-5 min-w-[20px]" />,
-      subItems: [],
-      path: "/coming-soon?title=BJ Forum"
-    },
+
   ];
 
   const toggleMenu = (title) => {
@@ -1574,7 +1563,7 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
         </a>
 
         <a
-          href="https://wa.me/+447311133922"
+          href="https://wa.me/+84583051232"
           target="_blank"
           rel="noopener noreferrer"
           className="transition-all duration-300 animate-bounce hover:animate-pulse"
