@@ -217,8 +217,8 @@ const HomeContent = () => {
         <div className="fixed top-0 left-0 w-full h-full bg-[#0a0a0a] flex justify-center items-center z-[10000000]">
           <div className="relative w-36 h-36 md:w-44 md:h-44 flex justify-center items-center">
             <div
-              className="absolute w-full h-full rounded-full border-[5px] border-transparent border-t-[#ff0000] border-b-[#ff0000] animate-spin"
-              style={{ filter: 'drop-shadow(0 0 10px #ff0000) drop-shadow(0 0 4px #ff0000)', animationDuration: '1s' }}
+              className="absolute w-full h-full rounded-full border-[5px] border-transparent border-t-[#F17225] border-b-[#F17225] animate-spin"
+              style={{ filter: 'drop-shadow(0 0 10px #F17225) drop-shadow(0 0 4px #F17225)', animationDuration: '1s' }}
             />
             <div className="z-10 flex justify-center items-center">
               <img className="w-[130px] md:w-[160px] object-contain" src={dynamicLogo} alt="Logo" />
