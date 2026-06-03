@@ -745,7 +745,7 @@ export default function Login() {
           <img
             src={dynamicLogo}
             alt="Logo"
-            className="w-[100px] md:w-[150px] cursor-pointer"
+            className="w-[80px] cursor-pointer"
           />
         </NavLink>
 
