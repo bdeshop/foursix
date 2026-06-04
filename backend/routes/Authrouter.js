@@ -98,7 +98,7 @@ const validatePaymentDetails = (paymentMethod, paymentData) => {
 
 Authrouter.post("/signup", async (req, res) => {
   try {
-    const { currency, phone, username, password, confirmPassword, fullName, email, referralCode, affiliateCode } = req.body;
+    const { currency, phone, username, password, confirmPassword, fullName, referralCode, affiliateCode } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent') || 'unknown';
 
@@ -158,10 +158,10 @@ Authrouter.post("/signup", async (req, res) => {
       referredBy = referrer._id;
     }
 
-    // Check if user already exists
+    // Check if user already exists (only username and phone, no email)
     const formattedPhone = `+880${phone}`;
     const existingUser = await User.findOne({
-      $or: [{ username }, { phone: formattedPhone }, { email }]
+      $or: [{ username }, { phone: formattedPhone }]
     });
 
     if (existingUser) {
@@ -175,12 +175,6 @@ Authrouter.post("/signup", async (req, res) => {
         return res.status(400).json({ 
           success: false,
           message: "Phone number already registered." 
-        });
-      }
-      if (email && existingUser.email === email) {
-        return res.status(400).json({ 
-          success: false,
-          message: "Email already registered." 
         });
       }
     }
@@ -211,14 +205,13 @@ Authrouter.post("/signup", async (req, res) => {
       timestamp: new Date()
     };
 
-    // Create new user
+    // Create new user (no email field)
     const newUser = new User({
       currency: currency || "BDT",
       phone: formattedPhone,
       username,
       password,
       fullName: fullName || username,
-      email: email || null,
       player_id,
       referredBy,
       registrationSource,
@@ -348,7 +341,7 @@ Authrouter.post("/signup", async (req, res) => {
       { expiresIn: "30d" }
     );
 
-    // Return success response with token
+    // Return success response with token (no email in response)
     res.status(201).json({
       success: true,
       message: "User created successfully",
@@ -357,7 +350,6 @@ Authrouter.post("/signup", async (req, res) => {
         id: newUser._id,
         player_id: newUser.player_id,
         username: newUser.username,
-        email: newUser.email,
         phone: newUser.phone,
         currency: newUser.currency,
         balance: newUser.balance,
@@ -382,7 +374,6 @@ Authrouter.post("/signup", async (req, res) => {
     });
   }
 });
-
 // ==================== SIMPLIFIED LOGIN ROUTE ====================
 
 Authrouter.post("/login", async (req, res) => {

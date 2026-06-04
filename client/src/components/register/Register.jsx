@@ -9,12 +9,11 @@ import { LanguageContext } from "../../context/LanguageContext";
 export default function Register() {
   const { t } = useContext(LanguageContext);
 
-  // Signup state
+  // Signup state (no email)
   const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [affiliateCode, setAffiliateCode] = useState("");
 
@@ -88,7 +87,6 @@ export default function Register() {
         medium: medium || 'referral',
         landingPage: window.location.pathname
       });
-      console.log('Affiliate click tracked successfully for:', affiliateCode);
     } catch (error) {
       console.error('Failed to track affiliate click:', error);
     }
@@ -125,7 +123,7 @@ export default function Register() {
     }
   };
 
-  // Direct signup without OTP
+  // Direct signup without OTP and without email
   const handleSignUpSubmit = async (e) => {
     e.preventDefault();
 
@@ -189,7 +187,6 @@ export default function Register() {
         password,
         confirmPassword,
         fullName: username,
-        email: email || undefined,
         referralCode: referralValid ? referralCode : undefined,
         affiliateCode: affiliateCode || undefined
       });
@@ -220,7 +217,6 @@ export default function Register() {
 
         // Reset form
         setPhone("");
-        setEmail("");
         setUsername("");
         setPassword("");
         setConfirmPassword("");
@@ -373,7 +369,7 @@ export default function Register() {
                           value={phone}
                           onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                           className="w-full py-2 md:py-3.5 bg-transparent font-[400] text-white font-[300] focus:outline-none placeholder-gray-500 text-sm md:text-base"
-                          placeholder={t?.enterPhoneNumber || "Enter phone number"}
+                          placeholder="Enter phone number"
                           disabled={isLoading}
                         />
                       </div>
@@ -392,7 +388,7 @@ export default function Register() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                       className="w-full p-2 md:p-4 text-sm bg-[#222424] font-[300] text-white focus:outline-none focus:border-[#0C4D38] hover:border-gray-600 transition-colors"
-                      placeholder={t?.enterUsername || "Enter username"}
+                      placeholder="Enter username"
                       disabled={isLoading}
                     />
                   </div>
@@ -408,7 +404,7 @@ export default function Register() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full p-2 md:p-4 text-sm font-[300] bg-[#222424] text-white focus:outline-none focus:border-[#0C4D38] hover:border-gray-600 transition-colors"
-                      placeholder={t?.createPassword || "Create password"}
+                      placeholder="Create password"
                       disabled={isLoading}
                     />
                   </div>
@@ -424,23 +420,7 @@ export default function Register() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full p-2 md:p-4 text-sm font-[300] bg-[#222424] text-white focus:outline-none focus:border-[#0C4D38] hover:border-gray-600 transition-colors"
-                      placeholder={t?.confirmPasswordPlaceholder || "Confirm password"}
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  {/* Email Input (Optional) */}
-                  <div className="mb-4">
-                    <label htmlFor="email" className="block text-sm md:text-sm text-gray-200 mb-2">
-                      Email (Optional)
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-2 md:p-4 text-sm bg-[#222424] font-[300] text-white focus:outline-none focus:border-green-500 hover:border-gray-600 transition-colors"
-                      placeholder="Enter your email (optional)"
+                      placeholder="Confirm password"
                       disabled={isLoading}
                     />
                   </div>
@@ -461,7 +441,7 @@ export default function Register() {
                           setReferrerInfo(null);
                         }}
                         className="flex-1 p-2 md:p-4 text-sm bg-[#222424] font-[300] text-white focus:outline-none focus:border-green-500 hover:border-gray-600 transition-colors"
-                        placeholder={t?.enterReferralCode || "Enter referral code"}
+                        placeholder="Enter referral code"
                         disabled={referralValid || isLoading}
                       />
                       {!referralValid && referralCode && (
@@ -541,7 +521,7 @@ export default function Register() {
                           value={loginUsername}
                           onChange={(e) => setLoginUsername(e.target.value)}
                           className="w-full py-2 md:py-3.5 bg-transparent font-[400] text-white font-[300] focus:outline-none placeholder-gray-500 text-sm md:text-base"
-                          placeholder={t?.enterYourUsername || "Enter your username"}
+                          placeholder="Enter your username"
                           disabled={isLoading}
                         />
                       </div>
@@ -565,7 +545,7 @@ export default function Register() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full py-2 md:py-3.5 bg-transparent font-[400] text-white font-[300] focus:outline-none placeholder-gray-500 text-sm md:text-base"
-                          placeholder={t?.enterYourPassword || "Enter your password"}
+                          placeholder="Enter your password"
                           disabled={isLoading}
                         />
                       </div>
