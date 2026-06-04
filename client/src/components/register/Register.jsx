@@ -39,12 +39,38 @@ export default function Register() {
 
   const API_BASE_URL = import.meta.env.VITE_API_KEY_Base_URL || 'http://localhost:5000';
 
-  // Translation helper function
-  const getTranslation = (key, fallback) => {
+  // Helper function to get translation with fallback
+  const getText = (key, fallback) => {
     if (t && t[key]) {
       return t[key];
     }
     return fallback;
+  };
+
+  // Get placeholder based on language
+  const getPlaceholder = (type) => {
+    if (language === 'bn') {
+      const placeholders = {
+        phone: "ফোন নম্বর লিখুন",
+        username: "ইউজারনেম লিখুন",
+        password: "পাসওয়ার্ড তৈরি করুন",
+        confirmPassword: "পাসওয়ার্ড নিশ্চিত করুন",
+        referral: "রেফারেল কোড লিখুন",
+        loginUsername: "আপনার ইউজারনেম লিখুন",
+        loginPassword: "আপনার পাসওয়ার্ড লিখুন"
+      };
+      return placeholders[type] || "";
+    }
+    const placeholders = {
+      phone: "Enter phone number",
+      username: "Enter username",
+      password: "Create password",
+      confirmPassword: "Confirm password",
+      referral: "Enter referral code",
+      loginUsername: "Enter your username",
+      loginPassword: "Enter your password"
+    };
+    return placeholders[type] || "";
   };
 
   // Fetch branding data
@@ -102,7 +128,7 @@ export default function Register() {
 
   const checkReferralCode = async () => {
     if (!referralCode) {
-      setReferralError(getTranslation('pleaseEnterReferralCode', "Please enter a referral code"));
+      setReferralError(getText('pleaseEnterReferralCode', "Please enter a referral code"));
       return;
     }
 
@@ -115,13 +141,13 @@ export default function Register() {
       if (response.data.success) {
         setReferralValid(true);
         setReferrerInfo(response.data.referrer);
-        toast.success(getTranslation('referralCodeValid', "Referral code is valid!"), {
+        toast.success(getText('referralCodeValid', "Referral code is valid!"), {
           position: "top-right",
           autoClose: 3000,
         });
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || getTranslation('invalidReferralCode', 'Invalid referral code');
+      const errorMessage = error.response?.data?.message || getText('invalidReferralCode', 'Invalid referral code');
       setReferralError(errorMessage);
       setReferralValid(false);
       setReferrerInfo(null);
@@ -131,56 +157,56 @@ export default function Register() {
     }
   };
 
-  // Direct signup without OTP and without email
+  // Direct signup without OTP
   const handleSignUpSubmit = async (e) => {
     e.preventDefault();
 
     // Validate phone
     if (!phone) {
-      setPhoneError(getTranslation('phoneRequired', "Phone number is required."));
+      setPhoneError(getText('phoneRequired', "Phone number is required."));
       return;
     }
 
     if (!/^1[0-9]{9}$/.test(phone)) {
-      setPhoneError(getTranslation('validPhoneNumber', "Please enter a valid Bangladeshi phone number, starting with 1."));
+      setPhoneError(getText('validPhoneNumber', "Please enter a valid Bangladeshi phone number, starting with 1."));
       return;
     }
 
     // Validate username
     if (!username) {
-      setSignupError(getTranslation('usernameRequired', "Username is required."));
+      setSignupError(getText('usernameRequired', "Username is required."));
       return;
     }
 
     if (!/^[a-z0-9_]+$/.test(username)) {
-      setSignupError(getTranslation('usernameFormat', "Username can only contain lowercase letters, numbers, and underscores."));
+      setSignupError(getText('usernameFormat', "Username can only contain lowercase letters, numbers, and underscores."));
       return;
     }
 
     if (username.length < 3) {
-      setSignupError(getTranslation('usernameMinLength', "Username must be at least 3 characters long."));
+      setSignupError(getText('usernameMinLength', "Username must be at least 3 characters long."));
       return;
     }
 
     // Validate password
     if (!password) {
-      setSignupError(getTranslation('passwordRequired', "Password is required."));
+      setSignupError(getText('passwordRequired', "Password is required."));
       return;
     }
 
     if (password.length < 6) {
-      setSignupError(getTranslation('passwordMinLength', "Password must be at least 6 characters long."));
+      setSignupError(getText('passwordMinLength', "Password must be at least 6 characters long."));
       return;
     }
 
     if (password !== confirmPassword) {
-      setSignupError(getTranslation('passwordMismatch', "Passwords do not match."));
+      setSignupError(getText('passwordMismatch', "Passwords do not match."));
       return;
     }
 
     // Validate referral code if provided
     if (referralCode && !referralValid) {
-      setReferralError(getTranslation('validateReferralFirst', "Please validate your referral code first"));
+      setReferralError(getText('validateReferralFirst', "Please validate your referral code first"));
       return;
     }
 
@@ -200,18 +226,18 @@ export default function Register() {
       });
 
       if (response.data.success) {
-        toast.success(getTranslation('accountCreated', "Account created successfully!"), {
+        toast.success(getText('accountCreated', "Account created successfully!"), {
           position: "top-right",
           autoClose: 3000,
         });
 
         if (response.data.user.isAffiliateReferred) {
-          toast.success(getTranslation('affiliateWelcome', "Welcome! You were referred by an affiliate partner."), {
+          toast.success(getText('affiliateWelcome', "Welcome! You were referred by an affiliate partner."), {
             position: "top-right",
             autoClose: 3000,
           });
         } else if (response.data.user.isUserReferred) {
-          toast.success(getTranslation('userReferralWelcome', "Welcome! You were referred by a friend."), {
+          toast.success(getText('userReferralWelcome', "Welcome! You were referred by a friend."), {
             position: "top-right",
             autoClose: 3000,
           });
@@ -238,12 +264,12 @@ export default function Register() {
           window.location.href = '/';
         }, 1000);
       } else {
-        toast.error(response.data.message || getTranslation('signupFailed', 'Signup failed'));
-        setSignupError(response.data.message || getTranslation('signupFailed', 'Signup failed'));
+        toast.error(response.data.message || getText('signupFailed', 'Signup failed'));
+        setSignupError(response.data.message || getText('signupFailed', 'Signup failed'));
       }
     } catch (error) {
       console.error('Signup error:', error);
-      const errorMessage = error.response?.data?.message || getTranslation('signupError', 'Signup failed. Please try again.');
+      const errorMessage = error.response?.data?.message || getText('signupError', 'Signup failed. Please try again.');
       setSignupError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -255,12 +281,12 @@ export default function Register() {
     e.preventDefault();
 
     if (!loginUsername) {
-      setLoginError(getTranslation('usernameRequired', "Username is required."));
+      setLoginError(getText('usernameRequired', "Username is required."));
       return;
     }
 
     if (!loginPassword) {
-      setLoginError(getTranslation('passwordRequired', "Password is required."));
+      setLoginError(getText('passwordRequired', "Password is required."));
       return;
     }
 
@@ -274,7 +300,7 @@ export default function Register() {
       });
 
       if (response.data.success) {
-        toast.success(getTranslation('loginSuccess', "Login successful!"), {
+        toast.success(getText('loginSuccess', "Login successful!"), {
           position: "top-right",
           autoClose: 3000,
         });
@@ -287,45 +313,16 @@ export default function Register() {
           window.location.href = '/';
         }, 1000);
       } else {
-        toast.error(response.data.message || getTranslation('loginFailed', 'Login failed'));
-        setLoginError(response.data.message || getTranslation('loginFailed', 'Login failed'));
+        toast.error(response.data.message || getText('loginFailed', 'Login failed'));
+        setLoginError(response.data.message || getText('loginFailed', 'Login failed'));
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || getTranslation('loginError', 'Login failed. Please check your credentials.');
+      const errorMessage = error.response?.data?.message || getText('loginError', 'Login failed. Please check your credentials.');
       setLoginError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Determine placeholder text based on language
-  const getPhonePlaceholder = () => {
-    return language === 'bn' ? "ফোন নম্বর লিখুন" : "Enter phone number";
-  };
-
-  const getUsernamePlaceholder = () => {
-    return language === 'bn' ? "ইউজারনেম লিখুন" : "Enter username";
-  };
-
-  const getPasswordPlaceholder = () => {
-    return language === 'bn' ? "পাসওয়ার্ড তৈরি করুন" : "Create password";
-  };
-
-  const getConfirmPasswordPlaceholder = () => {
-    return language === 'bn' ? "পাসওয়ার্ড নিশ্চিত করুন" : "Confirm password";
-  };
-
-  const getReferralPlaceholder = () => {
-    return language === 'bn' ? "রেফারেল কোড লিখুন" : "Enter referral code";
-  };
-
-  const getLoginUsernamePlaceholder = () => {
-    return language === 'bn' ? "আপনার ইউজারনেম লিখুন" : "Enter your username";
-  };
-
-  const getLoginPasswordPlaceholder = () => {
-    return language === 'bn' ? "আপনার পাসওয়ার্ড লিখুন" : "Enter your password";
   };
 
   return (
@@ -368,7 +365,7 @@ export default function Register() {
                 }}
                 className={`flex-1 py-3 md:py-4 text-center text-sm md:text-base font-medium cursor-pointer transition-colors duration-300 ${!isSignUpActive ? 'border-b-2 border-green-500 text-green-500' : 'text-gray-200 hover:text-gray-300'}`}
               >
-                {getTranslation('tabLogin', "Login")}
+                {getText('tabLogin', "Login")}
               </button>
               <button
                 onClick={() => {
@@ -377,7 +374,7 @@ export default function Register() {
                 }}
                 className={`flex-1 py-3 md:py-4 text-center text-sm md:text-base font-medium cursor-pointer transition-colors duration-300 ${isSignUpActive ? 'border-b-2 border-green-500 text-green-500' : 'text-gray-200 hover:text-gray-300'}`}
               >
-                {getTranslation('tabSignup', "Sign Up")}
+                {getText('tabSignup', "Sign Up")}
               </button>
             </div>
 
@@ -388,7 +385,7 @@ export default function Register() {
                   {/* Phone Number Input */}
                   <div className="mb-4">
                     <label htmlFor="phone" className="block text-sm md:text-sm text-gray-200 mb-2 font-[300]">
-                      {getTranslation('phoneNumber', "Phone Number")}
+                      {getText('phoneNumber', "Phone Number")}
                     </label>
                     <div className="flex items-stretch bg-[#222424] overflow-hidden hover:border-gray-600 transition-colors">
                       <div className="flex items-center px-2 md:px-3 rounded-l border-r border-gray-700">
@@ -406,7 +403,7 @@ export default function Register() {
                           value={phone}
                           onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                           className="w-full py-2 md:py-3.5 bg-transparent font-[400] text-white font-[300] focus:outline-none placeholder-gray-500 text-sm md:text-base"
-                          placeholder={getPhonePlaceholder()}
+                          placeholder={getPlaceholder('phone')}
                           disabled={isLoading}
                         />
                       </div>
@@ -417,7 +414,7 @@ export default function Register() {
                   {/* Username Input */}
                   <div className="mb-4">
                     <label htmlFor="username" className="block text-sm md:text-sm text-gray-200 mb-2">
-                      {getTranslation('usernameLabel', "Username")}
+                      {getText('usernameLabel', "Username")}
                     </label>
                     <input
                       type="text"
@@ -425,7 +422,7 @@ export default function Register() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                       className="w-full p-2 md:p-4 text-sm bg-[#222424] font-[300] text-white focus:outline-none focus:border-[#0C4D38] hover:border-gray-600 transition-colors"
-                      placeholder={getUsernamePlaceholder()}
+                      placeholder={getPlaceholder('username')}
                       disabled={isLoading}
                     />
                   </div>
@@ -433,7 +430,7 @@ export default function Register() {
                   {/* Password Input */}
                   <div className="mb-4">
                     <label htmlFor="password" className="block text-sm md:text-sm text-gray-200 mb-2">
-                      {getTranslation('passwordLabel', "Password")}
+                      {getText('passwordLabel', "Password")}
                     </label>
                     <input
                       type="password"
@@ -441,7 +438,7 @@ export default function Register() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full p-2 md:p-4 text-sm font-[300] bg-[#222424] text-white focus:outline-none focus:border-[#0C4D38] hover:border-gray-600 transition-colors"
-                      placeholder={getPasswordPlaceholder()}
+                      placeholder={getPlaceholder('password')}
                       disabled={isLoading}
                     />
                   </div>
@@ -449,7 +446,7 @@ export default function Register() {
                   {/* Confirm Password Input */}
                   <div className="mb-4">
                     <label htmlFor="confirmPassword" className="block text-sm md:text-sm text-gray-200 mb-2">
-                      {getTranslation('confirmPasswordLabel', "Confirm Password")}
+                      {getText('confirmPasswordLabel', "Confirm Password")}
                     </label>
                     <input
                       type="password"
@@ -457,7 +454,7 @@ export default function Register() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full p-2 md:p-4 text-sm font-[300] bg-[#222424] text-white focus:outline-none focus:border-[#0C4D38] hover:border-gray-600 transition-colors"
-                      placeholder={getConfirmPasswordPlaceholder()}
+                      placeholder={getPlaceholder('confirmPassword')}
                       disabled={isLoading}
                     />
                   </div>
@@ -465,7 +462,7 @@ export default function Register() {
                   {/* Referral Code Input */}
                   <div className="mb-4">
                     <label htmlFor="referralCode" className="block text-sm md:text-sm font-[300] text-gray-200 mb-2">
-                      {getTranslation('referralCodeLabel', "Referral Code (Optional)")}
+                      {getText('referralCodeLabel', "Referral Code (Optional)")}
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -478,7 +475,7 @@ export default function Register() {
                           setReferrerInfo(null);
                         }}
                         className="flex-1 p-2 md:p-4 text-sm bg-[#222424] font-[300] text-white focus:outline-none focus:border-green-500 hover:border-gray-600 transition-colors"
-                        placeholder={getReferralPlaceholder()}
+                        placeholder={getPlaceholder('referral')}
                         disabled={referralValid || isLoading}
                       />
                       {!referralValid && referralCode && (
@@ -488,7 +485,7 @@ export default function Register() {
                           disabled={isCheckingReferral || !referralCode || isLoading}
                           className="px-3 md:px-4 bg-[#0C4D38] text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-all shadow-md"
                         >
-                          {isCheckingReferral ? (getTranslation('checkingBtn', "Checking...")) : (getTranslation('verifyBtn', "Verify"))}
+                          {isCheckingReferral ? (getText('checkingBtn', "Checking...")) : (getText('verifyBtn', "Verify"))}
                         </button>
                       )}
                       {referralValid && (
@@ -502,14 +499,14 @@ export default function Register() {
                           className="px-3 md:px-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg text-sm font-[500] transition-all shadow-md"
                           disabled={isLoading}
                         >
-                          {getTranslation('changeBtn', "Change")}
+                          {getText('changeBtn', "Change")}
                         </button>
                       )}
                     </div>
                     {referralError && <p className="text-red-400 text-xs mt-1">{referralError}</p>}
                     {referralValid && referrerInfo && (
                       <p className="text-green-400 text-xs mt-1">
-                        {getTranslation('validReferralCode', "Valid referral code from")} {referrerInfo.username}
+                        {getText('validReferralCode', "Valid referral code from")} {referrerInfo.username}
                       </p>
                     )}
                   </div>
@@ -531,9 +528,9 @@ export default function Register() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        {getTranslation('creatingAccount', "Creating Account...")}
+                        {getText('creatingAccount', "Creating Account...")}
                       </span>
-                    ) : (getTranslation('signupBtn', "Sign Up"))}
+                    ) : (getText('signupBtn', "Sign Up"))}
                   </button>
 
                   {signupError && <p className="text-red-400 text-xs mt-3 text-center">{signupError}</p>}
@@ -543,7 +540,7 @@ export default function Register() {
                 <form onSubmit={handleLoginSubmit}>
                   <div className="mb-4">
                     <label htmlFor="loginUsername" className="block text-sm md:text-sm text-gray-200 mb-2 font-[300]">
-                      {getTranslation('usernameLabel', "Username")}
+                      {getText('usernameLabel', "Username")}
                     </label>
                     <div className="flex items-stretch bg-[#222424] overflow-hidden hover:border-gray-600 transition-colors">
                       <div className="flex items-center px-3 rounded-l border-r border-gray-700">
@@ -558,7 +555,7 @@ export default function Register() {
                           value={loginUsername}
                           onChange={(e) => setLoginUsername(e.target.value)}
                           className="w-full py-2 md:py-3.5 bg-transparent font-[400] text-white font-[300] focus:outline-none placeholder-gray-500 text-sm md:text-base"
-                          placeholder={getLoginUsernamePlaceholder()}
+                          placeholder={getPlaceholder('loginUsername')}
                           disabled={isLoading}
                         />
                       </div>
@@ -567,7 +564,7 @@ export default function Register() {
 
                   <div className="mb-4">
                     <label htmlFor="loginPassword" className="block text-sm md:text-sm text-gray-200 mb-2 font-[300]">
-                      {getTranslation('passwordLabel', "Password")}
+                      {getText('passwordLabel', "Password")}
                     </label>
                     <div className="flex items-stretch bg-[#222424] overflow-hidden hover:border-gray-600 transition-colors">
                       <div className="flex items-center px-3 rounded-l border-r border-gray-700">
@@ -582,7 +579,7 @@ export default function Register() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full py-2 md:py-3.5 bg-transparent font-[400] text-white font-[300] focus:outline-none placeholder-gray-500 text-sm md:text-base"
-                          placeholder={getLoginPasswordPlaceholder()}
+                          placeholder={getPlaceholder('loginPassword')}
                           disabled={isLoading}
                         />
                       </div>
@@ -604,20 +601,20 @@ export default function Register() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        {getTranslation('loggingIn', "Logging in...")}
+                        {getText('loggingIn', "Logging in...")}
                       </span>
-                    ) : (getTranslation('loginBtn', "Login"))}
+                    ) : (getText('loginBtn', "Login"))}
                   </button>
 
                   <div className="mt-4 text-right">
                     <NavLink to="/forgot-password" className="text-xs md:text-sm text-green-400 hover:text-green-300 hover:underline transition-colors">
-                      {getTranslation('forgotPassword', "Forgot Password?")}
+                      {getText('forgotPassword', "Forgot Password?")}
                     </NavLink>
                   </div>
 
                   <div className="mt-4 text-center">
                     <p className="text-gray-400 text-xs">
-                      {getTranslation('noAccount', "Don't have an account?")}{' '}
+                      {getText('noAccount', "Don't have an account?")}{' '}
                       <button
                         type="button"
                         onClick={() => {
@@ -628,7 +625,7 @@ export default function Register() {
                         }}
                         className="text-green-400 hover:text-green-300 font-medium hover:underline transition-colors"
                       >
-                        {getTranslation('signUpHere', "Sign up here")}
+                        {getText('signUpHere', "Sign up here")}
                       </button>
                     </p>
                   </div>
